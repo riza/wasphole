@@ -22,6 +22,7 @@ func New(cfg *config.Config, rec session.Recorder) *server.MCPServer {
 		server.WithResourceCapabilities(false, false),
 		server.WithHooks(hooks),
 	)
+	registerTools(s, cfg)
 	return s
 }
 
