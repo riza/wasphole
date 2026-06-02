@@ -22,7 +22,12 @@ func main() {
 		os.Exit(1)
 	}
 
-	rec := session.NullRecorder{} // replaced by FileRecorder in plan 02-03
+	rec, err := session.NewFileRecorder(cfg.Session.LogDir)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		os.Exit(1)
+	}
+
 	srv := mcp.New(cfg, rec)
 
 	switch cfg.Transport.Type {
