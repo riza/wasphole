@@ -96,3 +96,11 @@ canary:
   # Receives session ID, token type, and timestamp.
   # Leave empty to disable HTTP canary callbacks.
   http_callback: https://hooks.example.com/canary
+
+# ── Session Recording ────────────────────────────────────────────────────────
+# Controls where session logs are written.
+session:
+  # Directory for per-session JSONL logs.
+  # Each session gets a file: {log_dir}/{session_id}.jsonl
+  # Default: ./sessions
+  log_dir: ./sessions

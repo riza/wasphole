@@ -7,6 +7,7 @@ type Config struct {
 	Transport TransportConfig `yaml:"transport"`
 	Alerts    AlertsConfig    `yaml:"alerts"`
 	Canary    CanaryConfig    `yaml:"canary"`
+	Session   SessionConfig   `yaml:"session"`
 }
 
 // InstanceConfig controls the simulated environment (CFG-01).
@@ -58,4 +59,9 @@ type AlertSink struct {
 type CanaryConfig struct {
 	Domain       string `yaml:"domain"`        // DNS canary base domain, e.g. "canary.example.com"
 	HTTPCallback string `yaml:"http_callback"` // URL to POST when a canary fires
+}
+
+// SessionConfig controls session recording (SR-01, SR-06).
+type SessionConfig struct {
+	LogDir string `yaml:"log_dir"` // directory for JSONL session logs; defaults to "./sessions"
 }

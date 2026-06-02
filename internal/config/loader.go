@@ -32,6 +32,9 @@ func applyDefaults(cfg *Config) {
 	if cfg.AI.CacheDir == "" {
 		cfg.AI.CacheDir = "./cache"
 	}
+	if cfg.Session.LogDir == "" {
+		cfg.Session.LogDir = "./sessions"
+	}
 	if cfg.AI.Model == "" {
 		cfg.AI.Model = "claude-sonnet-4-6"
 	}
