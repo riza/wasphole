@@ -1,0 +1,78 @@
+# wasphole configuration example
+# Copy to config.yaml and fill in required fields before starting.
+
+# ── Instance ─────────────────────────────────────────────────────────────────
+# Controls which OS environment is simulated.
+instance:
+  # Required. Simulated operating system.
+  # Accepted values: "linux", "windows"
+  mode: linux
+
+  # Optional. Industry context used to shape AI-generated identities and
+  # responses. Examples: "fintech", "healthcare", "saas", "ecommerce"
+  industry: fintech
+
+  # Optional. Fixed random seed for deterministic identity generation.
+  # Leave empty to generate a new identity on first startup.
+  # Two deployments with different seeds produce different identities.
+  seed: ""
+
+# ── AI ───────────────────────────────────────────────────────────────────────
+# Controls the AI provider used for identity and response generation.
+ai:
+  # Required. AI provider.
+  # Accepted values: "anthropic"
+  provider: anthropic
+
+  # Required. Model ID to use for generation.
+  # Default: "claude-sonnet-4-6"
+  model: claude-sonnet-4-6
+
+  # Directory for caching AI-generated responses and identity.
+  # Cached responses ensure consistency across restarts.
+  # Default: "./cache"
+  cache_dir: ./cache
+
+# ── Transport ────────────────────────────────────────────────────────────────
+# Controls how the MCP server accepts connections.
+transport:
+  # Required. Transport protocol.
+  # Accepted values:
+  #   "stdio" — communicate over stdin/stdout (for direct Claude integration)
+  #   "http"  — listen for HTTP+SSE connections on a TCP port
+  type: http
+
+  # TCP port to listen on when type=http.
+  # Default: 8080
+  port: 8080
+
+# ── Alerts ───────────────────────────────────────────────────────────────────
+# One or more alert sinks. Each sink receives alert events independently.
+alerts:
+  sinks:
+    # Stdout sink: prints JSON alert lines to stdout (always useful for debugging).
+    - type: stdout
+      enabled: true
+
+    # Webhook sink: POSTs JSON alert payloads to a URL on WARN+ events.
+    - type: webhook
+      url: https://hooks.example.com/wasphole-alerts
+      enabled: false
+
+    # SIEM sink: emits CEF-formatted events for ingestion by a SIEM.
+    # - type: siem
+    #   format: cef
+    #   enabled: false
+
+# ── Canary ───────────────────────────────────────────────────────────────────
+# Controls canary token embedding and callback delivery.
+canary:
+  # Base domain for DNS canary tokens.
+  # Each session gets a unique subdomain: <session-id>.canary.example.com
+  # Leave empty to disable DNS canaries.
+  domain: canary.example.com
+
+  # URL to POST when any canary token fires.
+  # Receives session ID, token type, and timestamp.
+  # Leave empty to disable HTTP canary callbacks.
+  http_callback: https://hooks.example.com/canary
