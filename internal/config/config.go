@@ -18,8 +18,20 @@ type InstanceConfig struct {
 
 // AIConfig controls the AI provider used for identity and response generation (CFG-02).
 type AIConfig struct {
-	Provider string `yaml:"provider"` // "anthropic" — required
-	Model    string `yaml:"model"`    // e.g. "claude-sonnet-4-6" — required
+	// APIType selects the wire protocol: "anthropic" or "openai".
+	// Use "openai" for OpenAI-compatible providers (DeepSeek, MiniMax, GLM, etc.).
+	APIType string `yaml:"api_type"` // "anthropic" or "openai" — required
+
+	// BaseURL overrides the default API endpoint.
+	// Leave empty to use the standard endpoint for the api_type.
+	BaseURL string `yaml:"base_url"` // optional
+
+	// APIKey is the provider API key.
+	// If empty, falls back to ANTHROPIC_API_KEY (api_type=anthropic) or
+	// OPENAI_API_KEY (api_type=openai) environment variable.
+	APIKey string `yaml:"api_key"` // optional
+
+	Model    string `yaml:"model"`     // model ID — required
 	CacheDir string `yaml:"cache_dir"` // disk cache directory; defaults to "./cache"
 }
 

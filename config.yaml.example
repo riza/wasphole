@@ -20,12 +20,32 @@ instance:
 # ── AI ───────────────────────────────────────────────────────────────────────
 # Controls the AI provider used for identity and response generation.
 ai:
-  # Required. AI provider.
-  # Accepted values: "anthropic"
-  provider: anthropic
+  # Required. API protocol to use.
+  # Accepted values:
+  #   "anthropic" — Anthropic Messages API (Claude models)
+  #   "openai"    — OpenAI Chat Completions API (OpenAI, DeepSeek, MiniMax, GLM, etc.)
+  api_type: anthropic
 
-  # Required. Model ID to use for generation.
-  # Default: "claude-sonnet-4-6"
+  # Optional. Custom API base URL.
+  # Leave empty to use the provider's standard endpoint.
+  # Examples:
+  #   DeepSeek (Anthropic-compat):  https://api.deepseek.com/anthropic
+  #   DeepSeek (OpenAI-compat):     https://api.deepseek.com/v1
+  #   MiniMax:                      https://api.minimax.chat/v1
+  #   GLM (Zhipu):                  https://open.bigmodel.cn/api/paas/v4
+  base_url: ""
+
+  # Optional. API key for the provider.
+  # If empty, reads from ANTHROPIC_API_KEY (api_type=anthropic) or
+  # OPENAI_API_KEY (api_type=openai) environment variable.
+  api_key: ""
+
+  # Required. Model ID to request from the provider.
+  # Examples:
+  #   Anthropic:  claude-sonnet-4-6
+  #   DeepSeek:   deepseek-chat, deepseek-reasoner
+  #   MiniMax:    abab6.5s-chat
+  #   GLM:        glm-4-flash, glm-4
   model: claude-sonnet-4-6
 
   # Directory for caching AI-generated responses and identity.

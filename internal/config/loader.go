@@ -53,8 +53,10 @@ func validate(cfg *Config) error {
 		return fmt.Errorf("config: transport.type must be \"stdio\" or \"http\", got %q", cfg.Transport.Type)
 	}
 
-	if cfg.AI.Provider != "anthropic" {
-		return fmt.Errorf("config: ai.provider must be \"anthropic\", got %q", cfg.AI.Provider)
+	switch cfg.AI.APIType {
+	case "anthropic", "openai":
+	default:
+		return fmt.Errorf("config: ai.api_type must be \"anthropic\" or \"openai\", got %q", cfg.AI.APIType)
 	}
 
 	return nil
