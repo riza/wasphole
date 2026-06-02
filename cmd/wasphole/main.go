@@ -6,7 +6,10 @@ import (
 	"log"
 	"os"
 
+	mcpserver "github.com/mark3labs/mcp-go/server"
 	"github.com/riza/wasphole/internal/config"
+	"github.com/riza/wasphole/internal/mcp"
+	"github.com/riza/wasphole/internal/session"
 )
 
 func main() {
@@ -18,5 +21,22 @@ func main() {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		os.Exit(1)
 	}
-	log.Printf("wasphole starting: mode=%s transport=%s", cfg.Instance.Mode, cfg.Transport.Type)
+
+	rec := session.NullRecorder{} // replaced by FileRecorder in plan 02-03
+	srv := mcp.New(cfg, rec)
+
+	switch cfg.Transport.Type {
+	case "stdio":
+		log.Printf("wasphole starting: mode=%s transport=stdio", cfg.Instance.Mode)
+		if err := mcpserver.ServeStdio(srv); err != nil {
+			log.Printf("stdio: %v", err)
+		}
+	case "http":
+		addr := fmt.Sprintf(":%d", cfg.Transport.Port)
+		log.Printf("wasphole starting: mode=%s transport=http addr=%s", cfg.Instance.Mode, addr)
+		httpSrv := mcpserver.NewStreamableHTTPServer(srv)
+		if err := httpSrv.Start(addr); err != nil {
+			log.Printf("http: %v", err)
+		}
+	}
 }
