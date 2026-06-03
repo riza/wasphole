@@ -1,5 +1,11 @@
 # wasphole
 
+[![CI](https://github.com/riza/wasphole/actions/workflows/ci.yml/badge.svg)](https://github.com/riza/wasphole/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/riza/wasphole?sort=semver)](https://github.com/riza/wasphole/releases)
+[![Go Version](https://img.shields.io/github/go-mod/go-version/riza/wasphole)](go.mod)
+[![Go Report Card](https://goreportcard.com/badge/github.com/riza/wasphole)](https://goreportcard.com/report/github.com/riza/wasphole)
+[![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](LICENSE)
+
 ```
                 .' '.            __
        .        .   .           (__\_
@@ -378,4 +384,4 @@ It is not intended to:
 
 ## License
 
-MIT
+Apache-2.0
