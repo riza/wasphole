@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/riza/wasphole/internal/config"
@@ -65,39 +66,60 @@ func generate(ctx context.Context, client Client, instCfg config.InstanceConfig)
 		seed = fmt.Sprintf("%016x", time.Now().UnixNano())
 	}
 
-	system := "You are a configuration generator. Return only valid JSON, no markdown fences."
-	user := fmt.Sprintf(
-		"Generate a JSON object for a fictional %s. Fields:\n"+
-			"- server_name: short kebab-case slug (e.g. \"prod-db-west\", \"api-gateway-02\")\n"+
-			"- description: one sentence describing this server's purpose\n"+
-			"- persona: 3-5 paragraphs for an AI simulating tool responses from this server.\n"+
-			"  Include: company context (industry: %s), tech stack with version numbers,\n"+
-			"  naming conventions, error message tone, and internal jargon.\n\n"+
-			"Seed for uniqueness: %s\n"+
-			"Return only the JSON object.",
-		mode, industry, seed,
-	)
+	system := `You are helping configure a honeypot MCP server that impersonates a real ` +
+		`server to detect malicious AI agents. Generate a convincing fake server identity. ` +
+		`Respond using exactly this format and nothing else:
+
+NAME: <short-kebab-case slug, e.g. prod-db-west or api-gateway-02>
+DESCRIPTION: <one sentence describing this server's purpose>
+PERSONA: <3-5 paragraphs describing the fake company context, tech stack with version numbers, naming conventions, error message tone, and internal jargon — used as a system prompt for AI-generated tool responses>`
+
+	user := fmt.Sprintf("Mode: %s | Industry: %s | Seed: %s", mode, industry, seed)
 
 	raw, err := client.Generate(ctx, system, user)
 	if err != nil {
 		return nil, fmt.Errorf("identity: generate: %w", err)
 	}
 
+	id, err := parseIdentity(raw)
+	if err != nil {
+		return nil, fmt.Errorf("identity: %w", err)
+	}
+	return id, nil
+}
+
+func parseIdentity(raw string) (*Identity, error) {
 	var id Identity
-	if err := json.Unmarshal([]byte(raw), &id); err != nil {
-		// Retry once: Claude sometimes wraps in markdown fences despite instructions.
-		retryUser := "Return only the JSON object with no markdown fences:\n" + raw
-		raw2, err2 := client.Generate(ctx, system, retryUser)
-		if err2 != nil {
-			return nil, fmt.Errorf("identity: retry generate: %w", err2)
-		}
-		if err3 := json.Unmarshal([]byte(raw2), &id); err3 != nil {
-			return nil, fmt.Errorf("identity: parse failed after retry: %w", err3)
+	// PERSONA may span multiple lines; collect them after the PERSONA: key.
+	inPersona := false
+	var personaLines []string
+
+	for _, line := range strings.Split(raw, "\n") {
+		switch {
+		case strings.HasPrefix(line, "NAME:"):
+			id.ServerName = strings.TrimSpace(strings.TrimPrefix(line, "NAME:"))
+		case strings.HasPrefix(line, "DESCRIPTION:"):
+			id.Description = strings.TrimSpace(strings.TrimPrefix(line, "DESCRIPTION:"))
+			inPersona = false
+		case strings.HasPrefix(line, "PERSONA:"):
+			inPersona = true
+			if rest := strings.TrimSpace(strings.TrimPrefix(line, "PERSONA:")); rest != "" {
+				personaLines = append(personaLines, rest)
+			}
+		case inPersona:
+			personaLines = append(personaLines, line)
 		}
 	}
+	id.Persona = strings.TrimSpace(strings.Join(personaLines, "\n"))
 
 	if id.ServerName == "" {
-		return nil, fmt.Errorf("identity: generated JSON missing server_name")
+		return nil, fmt.Errorf("missing NAME field in response:\n%s", raw)
+	}
+	if id.Description == "" {
+		return nil, fmt.Errorf("missing DESCRIPTION field in response:\n%s", raw)
+	}
+	if id.Persona == "" {
+		return nil, fmt.Errorf("missing PERSONA field in response:\n%s", raw)
 	}
 	return &id, nil
 }
