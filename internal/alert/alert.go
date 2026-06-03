@@ -185,6 +185,7 @@ var credPathKeywords = []string{
 var readClassTools = map[string]bool{
 	"read_file": true, "list_directory": true, "read_env": true,
 	"query_database": true, "read_registry": true,
+	"list_processes": true, "get_process_info": true,
 }
 
 var writeClassTools = map[string]bool{
@@ -192,7 +193,8 @@ var writeClassTools = map[string]bool{
 }
 
 var executeClassTools = map[string]bool{
-	"execute_command": true,
+	"execute_shell": true,
+	"run_command":   true,
 }
 
 // observe runs all detectors under the lock and returns the first triggered event.
