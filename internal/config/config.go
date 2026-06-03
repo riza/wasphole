@@ -49,10 +49,12 @@ type AlertsConfig struct {
 
 // AlertSink is a single alert output target.
 type AlertSink struct {
-	Type    string `yaml:"type"`    // "stdout", "webhook", or "siem"
-	URL     string `yaml:"url"`     // webhook endpoint URL (type=webhook only)
-	Format  string `yaml:"format"`  // "cef" or "json" (type=siem only)
-	Enabled bool   `yaml:"enabled"` // defaults to true if omitted
+	Type          string `yaml:"type"`           // "stdout", "webhook", or "siem"
+	URL           string `yaml:"url"`            // webhook endpoint URL (type=webhook only)
+	Format        string `yaml:"format"`         // "cef" or "json" (type=siem only)
+	Path          string `yaml:"path"`           // output file path (type=siem only; empty = stderr)
+	WebhookSecret string `yaml:"webhook_secret"` // base64 HMAC signing secret (type=webhook only)
+	Enabled       bool   `yaml:"enabled"`        // defaults to true if omitted
 }
 
 // CanaryConfig controls canary token delivery (CFG-05).

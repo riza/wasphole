@@ -2,13 +2,19 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"log"
+	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	mcpserver "github.com/mark3labs/mcp-go/server"
 	"github.com/riza/wasphole/internal/ai"
+	"github.com/riza/wasphole/internal/alert"
 	"github.com/riza/wasphole/internal/canary"
 	"github.com/riza/wasphole/internal/config"
 	"github.com/riza/wasphole/internal/mcp"
@@ -60,8 +66,10 @@ func main() {
 
 	canaryIssuer := canary.NewIssuer(cfg.Canary)
 
+	alertEngine := alert.NewEngine(cfg.Alerts)
+
 	if cfg.Canary.ListenAddr != "" {
-		listener := canary.NewListener(canaryIssuer, cfg.Canary.HTTPCallback, nil) // engine wired in plan 06-02
+		listener := canary.NewListener(canaryIssuer, cfg.Canary.HTTPCallback, alertEngine)
 		go func() {
 			log.Printf("canary listener starting: addr=%s", cfg.Canary.ListenAddr)
 			if err := listener.Start(cfg.Canary.ListenAddr); err != nil {
@@ -70,7 +78,7 @@ func main() {
 		}()
 	}
 
-	srv := mcp.New(cfg, rec, state, identity.ServerName, responseCache, canaryIssuer, nil) // engine wired in plan 06-02
+	srv := mcp.New(cfg, rec, state, identity.ServerName, responseCache, canaryIssuer, alertEngine)
 
 	switch cfg.Transport.Type {
 	case "stdio":
@@ -78,12 +86,27 @@ func main() {
 		if err := mcpserver.ServeStdio(srv); err != nil {
 			log.Printf("stdio: %v", err)
 		}
+		rec.Close()
+
 	case "http":
 		addr := fmt.Sprintf(":%d", cfg.Transport.Port)
 		log.Printf("wasphole starting: mode=%s transport=http addr=%s", cfg.Instance.Mode, addr)
 		httpSrv := mcpserver.NewStreamableHTTPServer(srv)
-		if err := httpSrv.Start(addr); err != nil {
-			log.Printf("http: %v", err)
-		}
+
+		sigCtx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
+		defer stop()
+
+		go func() {
+			if err := httpSrv.Start(addr); err != nil && !errors.Is(err, http.ErrServerClosed) {
+				log.Printf("http: %v", err)
+			}
+		}()
+
+		<-sigCtx.Done()
+		log.Printf("wasphole: shutting down")
+		shutCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		_ = httpSrv.Shutdown(shutCtx)
+		rec.Close()
 	}
 }

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	mcplib "github.com/mark3labs/mcp-go/mcp"
+	"github.com/riza/wasphole/internal/config"
 )
 
 type Level string
@@ -88,7 +89,7 @@ type Engine struct {
 	sessions   sync.Map
 }
 
-func NewEngine(d *Dispatcher) *Engine {
+func newEngine(d *Dispatcher) *Engine {
 	return &Engine{dispatcher: d}
 }
 
@@ -325,4 +326,26 @@ func extractPathParam(params any) string {
 		return k
 	}
 	return req.GetString("query", "")
+}
+
+// NewEngine constructs an Engine with sinks built from config.
+// Always returns a non-nil Engine; sinks are empty if none are enabled.
+func NewEngine(cfg config.AlertsConfig) *Engine {
+	d := &Dispatcher{}
+	for _, s := range cfg.Sinks {
+		if !s.Enabled {
+			continue
+		}
+		switch s.Type {
+		case "stdout":
+			d.sinks = append(d.sinks, &StdoutSink{})
+		case "webhook":
+			if s.URL != "" {
+				d.sinks = append(d.sinks, &WebhookSink{url: s.URL, secret: s.WebhookSecret})
+			}
+		case "siem":
+			d.sinks = append(d.sinks, &SIEMSink{path: s.Path, format: s.Format})
+		}
+	}
+	return &Engine{dispatcher: d}
 }
