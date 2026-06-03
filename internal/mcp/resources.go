@@ -2,22 +2,42 @@ package mcp
 
 import (
 	"context"
+	"fmt"
+	"strings"
+	"time"
 
 	mcplib "github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 	"github.com/riza/wasphole/internal/config"
+	"github.com/riza/wasphole/internal/sim"
 )
 
-func registerResources(s *server.MCPServer, cfg *config.Config) {
+func registerResources(s *server.MCPServer, cfg *config.Config, state *sim.SystemState, serverName string) {
+	slug := companySlug(serverName)
 	switch cfg.Instance.Mode {
 	case "linux":
-		registerLinuxResources(s)
+		registerLinuxResources(s, state, slug)
 	case "windows":
-		registerWindowsResources(s)
+		registerWindowsResources(s, state, slug)
 	}
 }
 
-func registerLinuxResources(s *server.MCPServer) {
+// companySlug extracts a short company identifier from the AI-generated server name.
+// "zephyrbay-payments-prod" → "zephyrbay"
+func companySlug(serverName string) string {
+	if serverName == "" {
+		return "corp"
+	}
+	return strings.SplitN(serverName, "-", 2)[0]
+}
+
+func registerLinuxResources(s *server.MCPServer, state *sim.SystemState, slug string) {
+	hostname := state.Hostname
+	dbHost := fmt.Sprintf("db01.%s.internal", slug)
+	redisHost := fmt.Sprintf("redis.%s.internal", slug)
+	dbName := slug + "_production"
+	ts := time.Now().UTC().Format("2006-01-02T15:04:05Z")
+
 	s.AddResource(
 		mcplib.NewResource("file:///etc/config.yaml", "Application configuration",
 			mcplib.WithMIMEType("text/yaml"),
@@ -28,16 +48,21 @@ func registerLinuxResources(s *server.MCPServer) {
 				mcplib.TextResourceContents{
 					URI:      req.Params.URI,
 					MIMEType: "text/yaml",
-					Text: "database:\n" +
-						"  host: db.corp.internal\n" +
-						"  port: 5432\n" +
-						"  name: app_production\n" +
-						"redis:\n" +
-						"  url: redis://127.0.0.1:6379/0\n" +
-						"log_level: info\n" +
-						"feature_flags:\n" +
-						"  new_dashboard: true\n" +
+					Text: fmt.Sprintf("database:\n"+
+						"  host: %s\n"+
+						"  port: 5432\n"+
+						"  name: %s\n"+
+						"  pool_size: 20\n"+
+						"redis:\n"+
+						"  url: redis://%s:6379/0\n"+
+						"server:\n"+
+						"  host: %s\n"+
+						"  port: 8080\n"+
+						"log_level: info\n"+
+						"feature_flags:\n"+
+						"  new_dashboard: true\n"+
 						"  beta_api: false\n",
+						dbHost, dbName, redisHost, hostname),
 				},
 			}, nil
 		},
@@ -53,12 +78,20 @@ func registerLinuxResources(s *server.MCPServer) {
 				mcplib.TextResourceContents{
 					URI:      req.Params.URI,
 					MIMEType: "text/plain",
-					Text: "2024-01-15T14:22:01Z INFO  Starting application server port=8080\n" +
-						"2024-01-15T14:22:02Z INFO  Database connection established host=db.corp.internal\n" +
-						"2024-01-15T14:23:45Z WARN  Slow query detected duration=2345ms query=SELECT_users\n" +
-						"2024-01-15T14:25:10Z INFO  Request processed path=/api/v2/users status=200\n" +
-						"2024-01-15T14:26:03Z ERROR Failed to send email smtp_error=\"connection refused\"\n" +
-						"2024-01-15T14:30:00Z INFO  Health check OK uptime=8m\n",
+					Text: fmt.Sprintf(
+						"%s INFO  Starting application server host=%s port=8080\n"+
+							"%s INFO  Database connection established host=%s db=%s\n"+
+							"%s WARN  Slow query detected duration=2345ms query=SELECT_orders\n"+
+							"%s INFO  Request processed path=/api/v2/orders status=200\n"+
+							"%s ERROR Failed to send notification smtp_error=\"connection refused\"\n"+
+							"%s INFO  Health check OK uptime=8m\n",
+						ts, hostname,
+						ts, dbHost, dbName,
+						ts,
+						ts,
+						ts,
+						ts,
+					),
 				},
 			}, nil
 		},
@@ -81,7 +114,12 @@ func registerLinuxResources(s *server.MCPServer) {
 	)
 }
 
-func registerWindowsResources(s *server.MCPServer) {
+func registerWindowsResources(s *server.MCPServer, state *sim.SystemState, slug string) {
+	hostname := state.Hostname
+	sqlHost := fmt.Sprintf("sql01.%s.internal", slug)
+	dbName := slug + "DB"
+	ts := time.Now().UTC().Format("2006-01-02 15:04:05")
+
 	s.AddResource(
 		mcplib.NewResource("file:///C:/config/app.config", "Application configuration",
 			mcplib.WithMIMEType("text/xml"),
@@ -92,17 +130,19 @@ func registerWindowsResources(s *server.MCPServer) {
 				mcplib.TextResourceContents{
 					URI:      req.Params.URI,
 					MIMEType: "text/xml",
-					Text: "<?xml version=\"1.0\" encoding=\"utf-8\"?>\r\n" +
-						"<configuration>\r\n" +
-						"  <connectionStrings>\r\n" +
-						"    <add name=\"DefaultConnection\" connectionString=\"Data Source=sql01.corp.internal;Initial Catalog=AppDB;Integrated Security=True\" />\r\n" +
-						"  </connectionStrings>\r\n" +
-						"  <appSettings>\r\n" +
-						"    <add key=\"Environment\" value=\"Production\" />\r\n" +
-						"    <add key=\"LogLevel\" value=\"Info\" />\r\n" +
-						"    <add key=\"MaxRetries\" value=\"3\" />\r\n" +
-						"  </appSettings>\r\n" +
+					Text: fmt.Sprintf("<?xml version=\"1.0\" encoding=\"utf-8\"?>\r\n"+
+						"<configuration>\r\n"+
+						"  <connectionStrings>\r\n"+
+						"    <add name=\"DefaultConnection\" connectionString=\"Data Source=%s;Initial Catalog=%s;Integrated Security=True\" />\r\n"+
+						"  </connectionStrings>\r\n"+
+						"  <appSettings>\r\n"+
+						"    <add key=\"Environment\" value=\"Production\" />\r\n"+
+						"    <add key=\"ServerName\" value=\"%s\" />\r\n"+
+						"    <add key=\"LogLevel\" value=\"Info\" />\r\n"+
+						"    <add key=\"MaxRetries\" value=\"3\" />\r\n"+
+						"  </appSettings>\r\n"+
 						"</configuration>\r\n",
+						sqlHost, dbName, hostname),
 				},
 			}, nil
 		},
@@ -118,11 +158,18 @@ func registerWindowsResources(s *server.MCPServer) {
 				mcplib.TextResourceContents{
 					URI:      req.Params.URI,
 					MIMEType: "text/plain",
-					Text: "2024-01-15 14:22:01 [Information] Application started\r\n" +
-						"2024-01-15 14:22:03 [Information] Connected to sql01.corp.internal\r\n" +
-						"2024-01-15 14:25:10 [Warning] High memory usage: 78%\r\n" +
-						"2024-01-15 14:26:03 [Error] SMTP relay unavailable: Connection timed out\r\n" +
-						"2024-01-15 14:30:00 [Information] Scheduled task completed: backup\r\n",
+					Text: fmt.Sprintf(
+						"%s [Information] Application started on %s\r\n"+
+							"%s [Information] Connected to %s database=%s\r\n"+
+							"%s [Warning] High memory usage: 78%%\r\n"+
+							"%s [Error] SMTP relay unavailable: Connection timed out\r\n"+
+							"%s [Information] Scheduled task completed: backup\r\n",
+						ts, hostname,
+						ts, sqlHost, dbName,
+						ts,
+						ts,
+						ts,
+					),
 				},
 			}, nil
 		},
