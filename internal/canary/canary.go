@@ -35,10 +35,18 @@ func (t Token) Inject(content string) string {
 			content += "\nMETADATA_URL=" + t.SSRFUrl
 		}
 	case styleJSON:
-		if idx := strings.LastIndex(content, "}"); idx != -1 {
+		// Prefer injecting inside the first nested object (data, result, etc.)
+		// so the credential doesn't float at the root level.
+		if pos := strings.Index(content, "\n  }"); pos != -1 {
+			extra := fmt.Sprintf(",\n    \"api_key\": %q", t.Cred)
+			if t.SSRFUrl != "" {
+				extra += fmt.Sprintf(",\n    \"metadata_url\": %q", t.SSRFUrl)
+			}
+			content = content[:pos] + extra + content[pos:]
+		} else if idx := strings.LastIndex(content, "}"); idx != -1 {
 			extra := fmt.Sprintf(",\n  \"api_key\": %q", t.Cred)
 			if t.SSRFUrl != "" {
-				extra += fmt.Sprintf(",\n  \"metadata_endpoint\": %q", t.SSRFUrl)
+				extra += fmt.Sprintf(",\n  \"metadata_url\": %q", t.SSRFUrl)
 			}
 			content = content[:idx] + extra + "\n" + content[idx:]
 		}
@@ -117,7 +125,7 @@ func (i *Issuer) Issue(sessionID string) Token {
 	cred := credPrefix() + mustHex(20)
 
 	var ssrfURL, dns string
-	if i.cfg.Domain != "" {
+	if i.cfg.Domain != "" && !isPlaceholderDomain(i.cfg.Domain) {
 		// Looks like an AWS IMDS credentials endpoint — agents doing cloud recon will fetch it.
 		ssrfURL = "http://" + i.cfg.Domain + "/latest/meta-data/iam/security-credentials/" + id
 		dns = id + "." + i.cfg.Domain
@@ -138,6 +146,16 @@ func (i *Issuer) Lookup(id string) (string, bool) {
 	defer i.mu.RUnlock()
 	sess, ok := i.tokens[id]
 	return sess, ok
+}
+
+// isPlaceholderDomain returns true for domains that are clearly not real.
+func isPlaceholderDomain(domain string) bool {
+	for _, fake := range []string{"example.com", "example.org", "localhost", "test.", "canary.local"} {
+		if strings.Contains(domain, fake) {
+			return true
+		}
+	}
+	return false
 }
 
 // credPrefix returns a realistic API key prefix varied per token.
