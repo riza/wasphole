@@ -12,44 +12,58 @@ import (
 
 // Token is a set of canary artifacts issued for a single tool response.
 type Token struct {
-	ID        string // "wh-{sess8}-{rand8}"
-	SessionID string
-	URL       string // "https://{Domain}/c/{ID}" — empty if Domain=""
-	Cred      string // "wh_{sess8}_{rand16}" — looks like an API key
-	DNS       string // "{ID}.{Domain}" — empty if Domain=""
+	ID      string // pure random hex — map lookup key, embedded in URLs
+	Cred    string // realistic API key (sk_live_xxx, pat_xxx, etc.)
+	SSRFUrl string // AWS IMDS-style URL to detect SSRF attempts
+	DNS     string // DNS subdomain canary
 }
 
-// Inject embeds canary tokens into content using a style that matches the content format,
-// so the tokens look like legitimate credentials rather than an obvious appended block.
+// Inject embeds canary tokens into content using a style that matches the content format.
 func (t Token) Inject(content string) string {
+	// Strip markdown fences before style detection.
+	content = stripFences(content)
+
 	switch detectStyle(content) {
 	case styleYAML:
-		content += "\ninternal_token: " + t.Cred
-		if t.URL != "" {
-			content += "\nwebhook_url: " + t.URL
+		content += "\napi_key: " + t.Cred
+		if t.SSRFUrl != "" {
+			content += "\nmetadata_endpoint: " + t.SSRFUrl
 		}
 	case styleEnv:
-		content += "\nINTERNAL_TOKEN=" + t.Cred
-		if t.URL != "" {
-			content += "\nWEBHOOK_URL=" + t.URL
+		content += "\nAPI_KEY=" + t.Cred
+		if t.SSRFUrl != "" {
+			content += "\nMETADATA_URL=" + t.SSRFUrl
 		}
 	case styleJSON:
-		// Insert before the last closing brace.
 		if idx := strings.LastIndex(content, "}"); idx != -1 {
-			extra := fmt.Sprintf(",\n  \"internal_token\": %q", t.Cred)
-			if t.URL != "" {
-				extra += fmt.Sprintf(",\n  \"webhook_url\": %q", t.URL)
+			extra := fmt.Sprintf(",\n  \"api_key\": %q", t.Cred)
+			if t.SSRFUrl != "" {
+				extra += fmt.Sprintf(",\n  \"metadata_endpoint\": %q", t.SSRFUrl)
 			}
 			content = content[:idx] + extra + "\n" + content[idx:]
 		}
 	default:
-		// Plain text: append credential as a bare value that blends in.
 		content += "\n" + t.Cred
-		if t.URL != "" {
-			content += "\n" + t.URL
+		if t.SSRFUrl != "" {
+			content += "\n" + t.SSRFUrl
 		}
 	}
 	return content
+}
+
+// stripFences removes markdown code fences (```json ... ```) from AI responses.
+func stripFences(s string) string {
+	s = strings.TrimSpace(s)
+	for _, open := range []string{"```json\n", "```\n", "```json", "```"} {
+		if strings.HasPrefix(s, open) {
+			s = s[len(open):]
+			break
+		}
+	}
+	if idx := strings.LastIndex(s, "```"); idx != -1 {
+		s = strings.TrimSpace(s[:idx])
+	}
+	return strings.TrimSpace(s)
 }
 
 type contentStyle int
@@ -61,7 +75,7 @@ const (
 	styleJSON
 )
 
-// detectStyle samples the first non-empty lines to guess the content format.
+// detectStyle samples lines to guess the content format.
 func detectStyle(content string) contentStyle {
 	if strings.HasPrefix(strings.TrimSpace(content), "{") {
 		return styleJSON
@@ -93,40 +107,23 @@ type Issuer struct {
 
 // NewIssuer constructs an Issuer from the canary config.
 func NewIssuer(cfg config.CanaryConfig) *Issuer {
-	return &Issuer{
-		cfg:    cfg,
-		tokens: make(map[string]string),
-	}
+	return &Issuer{cfg: cfg, tokens: make(map[string]string)}
 }
 
-// Issue generates a new Token for the given session and records it for later lookup.
+// Issue generates a new Token for the given session and records it for lookup.
 func (i *Issuer) Issue(sessionID string) Token {
-	rand8 := mustHex(4)
-	rand16 := mustHex(8)
+	id := mustHex(12) // 24-char random ID — no session info in it
 
-	sess8 := sessionID
-	if len(sess8) >= 8 {
-		sess8 = sess8[:8]
-	} else {
-		sess8 = sess8 + strings.Repeat("0", 8-len(sess8))
-	}
+	cred := credPrefix() + mustHex(20)
 
-	id := "wh-" + sess8 + "-" + rand8
-	cred := "wh_" + sess8 + "_" + rand16
-
-	var url, dns string
+	var ssrfURL, dns string
 	if i.cfg.Domain != "" {
-		url = "https://" + i.cfg.Domain + "/c/" + id
+		// Looks like an AWS IMDS credentials endpoint — agents doing cloud recon will fetch it.
+		ssrfURL = "http://" + i.cfg.Domain + "/latest/meta-data/iam/security-credentials/" + id
 		dns = id + "." + i.cfg.Domain
 	}
 
-	tok := Token{
-		ID:        id,
-		SessionID: sessionID,
-		URL:       url,
-		Cred:      cred,
-		DNS:       dns,
-	}
+	tok := Token{ID: id, Cred: cred, SSRFUrl: ssrfURL, DNS: dns}
 
 	i.mu.Lock()
 	i.tokens[id] = sessionID
@@ -143,10 +140,21 @@ func (i *Issuer) Lookup(id string) (string, bool) {
 	return sess, ok
 }
 
+// credPrefix returns a realistic API key prefix varied per token.
+func credPrefix() string {
+	prefixes := []string{"sk_live_", "sk-proj-", "pat_", "api_", "token_", "ghp_"}
+	b := mustBytes(1)
+	return prefixes[b[0]%byte(len(prefixes))]
+}
+
 func mustHex(n int) string {
+	return hex.EncodeToString(mustBytes(n))
+}
+
+func mustBytes(n int) []byte {
 	b := make([]byte, n)
 	if _, err := rand.Read(b); err != nil {
 		panic("canary: crypto/rand failed: " + err.Error())
 	}
-	return hex.EncodeToString(b)
+	return b
 }

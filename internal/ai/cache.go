@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 
 	"golang.org/x/sync/singleflight"
 )
@@ -58,6 +59,7 @@ func (rc *ResponseCache) Get(ctx context.Context, tool, description string, para
 		if err != nil {
 			return "", fmt.Errorf("cache: generate %s: %w", tool, err)
 		}
+		text = stripMarkdownFences(text)
 		if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
 			return "", fmt.Errorf("cache: mkdir: %w", err)
 		}
@@ -90,6 +92,21 @@ func cacheKey(tool string, params map[string]any) string {
 
 	h := sha256.Sum256([]byte(tool + ":" + string(b)))
 	return hex.EncodeToString(h[:])
+}
+
+// stripMarkdownFences removes ```json / ``` wrappers that models sometimes add.
+func stripMarkdownFences(s string) string {
+	s = strings.TrimSpace(s)
+	for _, open := range []string{"```json\n", "```\n", "```json", "```"} {
+		if strings.HasPrefix(s, open) {
+			s = s[len(open):]
+			break
+		}
+	}
+	if idx := strings.LastIndex(s, "```"); idx != -1 {
+		s = strings.TrimSpace(s[:idx])
+	}
+	return strings.TrimSpace(s)
 }
 
 // toolPrompt builds the user message for a tool call generation request.
