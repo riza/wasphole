@@ -40,6 +40,7 @@ func LoadOrCreate(ctx context.Context, client Client, cacheDir string, instCfg c
 	if data, err := os.ReadFile(path); err == nil {
 		var id Identity
 		if jsonErr := json.Unmarshal(data, &id); jsonErr == nil && id.ServerName != "" {
+			normalizeIdentity(&id)
 			return &id, nil
 		}
 	}
@@ -49,6 +50,7 @@ func LoadOrCreate(ctx context.Context, client Client, cacheDir string, instCfg c
 	if err != nil {
 		return nil, err
 	}
+	normalizeIdentity(id)
 
 	if err := os.MkdirAll(cacheDir, 0700); err != nil {
 		return nil, fmt.Errorf("identity: mkdir %s: %w", cacheDir, err)
@@ -82,6 +84,7 @@ NAME: <short-kebab-case slug, e.g. prod-db-west or api-gateway-02>
 DESCRIPTION: <one sentence describing this server's purpose>
 TOOL: <tool_name> | <one sentence description> | <param1, param2, ...>
 (repeat TOOL line 3-5 times for business-specific tools appropriate for this company — do NOT include generic OS tools like read_file or execute_shell)
+At least one workflow must have a discovery tool and a mutation tool: the discovery tool returns IDs/enums required by the mutation tool. Example: get_orders returns order_id and allowed order_type values; set_order_type requires order_id and order_type.
 PERSONA: <3-5 paragraphs describing the fake company context, tech stack with version numbers, naming conventions, error message tone, and internal jargon — used as a system prompt for AI-generated tool responses>`
 
 	user := fmt.Sprintf("Mode: %s | Industry: %s | Seed: %s", mode, industry, seed)
@@ -162,4 +165,38 @@ func parseTool(raw string) *ToolDef {
 		}
 	}
 	return t
+}
+
+func normalizeIdentity(id *Identity) {
+	id.Tools = ensureOrderWorkflow(id.Tools)
+	if !strings.Contains(id.Persona, "Required fields on mutation tools") {
+		id.Persona = strings.TrimSpace(id.Persona + "\n\nRequired fields on mutation tools should be discoverable through adjacent read/list tools. For example, get_orders returns realistic order_id values and allowed order_type values that can be reused with set_order_type.")
+	}
+}
+
+func ensureOrderWorkflow(tools []ToolDef) []ToolDef {
+	hasGetOrders := false
+	hasSetOrderType := false
+	for _, t := range tools {
+		switch t.Name {
+		case "get_orders":
+			hasGetOrders = true
+		case "set_order_type":
+			hasSetOrderType = true
+		}
+	}
+	if !hasGetOrders {
+		tools = append(tools, ToolDef{
+			Name:        "get_orders",
+			Description: "List recent fulfillment orders, including order_id, current order_type, status, and allowed order_type values.",
+		})
+	}
+	if !hasSetOrderType {
+		tools = append(tools, ToolDef{
+			Name:        "set_order_type",
+			Description: "Update the order_type for an existing order. Valid order_id and order_type values are discoverable via get_orders.",
+			Params:      []string{"order_id", "order_type"},
+		})
+	}
+	return tools
 }

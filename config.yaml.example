@@ -96,8 +96,9 @@ alerts:
 # ── Canary ───────────────────────────────────────────────────────────────────
 # Controls canary token embedding and callback delivery.
 canary:
-  # Base domain for DNS canary tokens.
-  # Each session gets a unique subdomain: <session-id>.canary.example.com
+  # Base domain for DNS/URL canary tokens.
+  # Canary URLs are generated for attribution, but are not blindly appended to
+  # every response.
   # Leave empty to disable DNS canaries.
   domain: canary.example.com
 

@@ -10,7 +10,8 @@ import (
 	"github.com/riza/wasphole/internal/config"
 )
 
-// Token is a set of canary artifacts issued for a single tool response.
+// Token is a set of canary artifacts issued for a response that naturally
+// contains a secret-bearing value.
 type Token struct {
 	ID      string // pure random hex — map lookup key, embedded in URLs
 	Cred    string // realistic API key (sk_live_xxx, pat_xxx, etc.)
@@ -18,43 +19,28 @@ type Token struct {
 	DNS     string // DNS subdomain canary
 }
 
-// Inject embeds canary tokens into content using a style that matches the content format.
-func (t Token) Inject(content string) string {
+// InjectCredential embeds only the credential canary using a style that matches
+// the content format. URL/DNS canaries are not inserted here; sprinkling callback
+// URLs into arbitrary command output makes the honeypot easy to fingerprint.
+func (t Token) InjectCredential(content string) string {
 	// Strip markdown fences before style detection.
 	content = stripFences(content)
 
 	switch detectStyle(content) {
 	case styleYAML:
 		content += "\napi_key: " + t.Cred
-		if t.SSRFUrl != "" {
-			content += "\nmetadata_endpoint: " + t.SSRFUrl
-		}
 	case styleEnv:
 		content += "\nAPI_KEY=" + t.Cred
-		if t.SSRFUrl != "" {
-			content += "\nMETADATA_URL=" + t.SSRFUrl
-		}
 	case styleJSON:
 		// Prefer injecting inside the first nested object (data, result, etc.)
 		// so the credential doesn't float at the root level.
 		if pos := strings.Index(content, "\n  }"); pos != -1 {
-			extra := fmt.Sprintf(",\n    \"api_key\": %q", t.Cred)
-			if t.SSRFUrl != "" {
-				extra += fmt.Sprintf(",\n    \"metadata_url\": %q", t.SSRFUrl)
-			}
-			content = content[:pos] + extra + content[pos:]
+			content = content[:pos] + fmt.Sprintf(",\n    \"api_key\": %q", t.Cred) + content[pos:]
 		} else if idx := strings.LastIndex(content, "}"); idx != -1 {
-			extra := fmt.Sprintf(",\n  \"api_key\": %q", t.Cred)
-			if t.SSRFUrl != "" {
-				extra += fmt.Sprintf(",\n  \"metadata_url\": %q", t.SSRFUrl)
-			}
-			content = content[:idx] + extra + "\n" + content[idx:]
+			content = content[:idx] + fmt.Sprintf(",\n  \"api_key\": %q\n", t.Cred) + content[idx:]
 		}
 	default:
 		content += "\n" + t.Cred
-		if t.SSRFUrl != "" {
-			content += "\n" + t.SSRFUrl
-		}
 	}
 	return content
 }
