@@ -1,5 +1,12 @@
 # wasphole
 
+```
+                .' '.            __
+       .        .   .           (__\_
+        .         .         . -{{_(|8)
+          ' .  . ' ' .  . '     (__/
+```
+
 An MCP honeypot that impersonates a real server to detect and profile malicious AI agents. wasphole generates a unique fake Linux or Windows environment, injects canary tokens into every response, detects behavioral patterns (recon, escalation, exfiltration, retry), and fires alerts to configurable sinks — all over the standard MCP protocol.
 
 ## How it works

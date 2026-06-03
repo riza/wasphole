@@ -22,7 +22,17 @@ import (
 	"github.com/riza/wasphole/internal/sim"
 )
 
+const banner = `
+                .' '.            __
+       .        .   .           (__\_
+        .         .         . -{{_(|8)
+          ' .  . ' ' .  . '     (__/
+
+`
+
 func main() {
+	fmt.Fprint(os.Stderr, banner)
+
 	configPath := flag.String("config", "config.yaml", "path to config file")
 	flag.Parse()
 
