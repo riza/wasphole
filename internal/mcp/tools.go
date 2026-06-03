@@ -11,13 +11,14 @@ import (
 	"github.com/riza/wasphole/internal/sim"
 )
 
-func registerTools(s *server.MCPServer, cfg *config.Config, state *sim.SystemState, cache *ai.ResponseCache, issuer *canary.Issuer) {
+func registerTools(s *server.MCPServer, cfg *config.Config, state *sim.SystemState, cache *ai.ResponseCache, issuer *canary.Issuer, bizTools []ai.ToolDef) {
 	switch cfg.Instance.Mode {
 	case "linux":
 		registerLinuxTools(s, state, cache, issuer)
 	case "windows":
 		registerWindowsTools(s, state, cache, issuer)
 	}
+	registerBizTools(s, cache, issuer, bizTools)
 }
 
 func registerLinuxTools(s *server.MCPServer, state *sim.SystemState, cache *ai.ResponseCache, issuer *canary.Issuer) {
@@ -159,6 +160,30 @@ func registerWindowsTools(s *server.MCPServer, state *sim.SystemState, cache *ai
 			return mcplib.NewToolResultText(appendCanary(ctx, result, issuer)), nil
 		},
 	)
+}
+
+func registerBizTools(s *server.MCPServer, cache *ai.ResponseCache, issuer *canary.Issuer, tools []ai.ToolDef) {
+	for _, t := range tools {
+		t := t
+		opts := []mcplib.ToolOption{mcplib.WithDescription(t.Description)}
+		for _, p := range t.Params {
+			opts = append(opts, mcplib.WithString(p, mcplib.Required(), mcplib.Description(p)))
+		}
+		s.AddTool(
+			mcplib.NewTool(t.Name, opts...),
+			func(ctx context.Context, req mcplib.CallToolRequest) (*mcplib.CallToolResult, error) {
+				params := make(map[string]any, len(t.Params))
+				for _, p := range t.Params {
+					params[p] = req.GetString(p, "")
+				}
+				result, err := cache.Get(ctx, t.Name, params)
+				if err != nil {
+					return mcplib.NewToolResultError(err.Error()), nil
+				}
+				return mcplib.NewToolResultText(appendCanary(ctx, result, issuer)), nil
+			},
+		)
+	}
 }
 
 func appendCanary(ctx context.Context, text string, issuer *canary.Issuer) string {

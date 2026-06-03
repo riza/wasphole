@@ -103,7 +103,7 @@ func main() {
 		}()
 	}
 
-	srv := mcp.New(cfg, rec, state, identity.ServerName, responseCache, canaryIssuer, alertEngine)
+	srv := mcp.New(cfg, rec, state, identity.ServerName, responseCache, canaryIssuer, alertEngine, identity.Tools)
 
 	switch cfg.Transport.Type {
 	case "stdio":

@@ -16,7 +16,7 @@ import (
 // New constructs an MCPServer pre-wired with hooks for session recording and alerting.
 // name is the AI-generated server identity name (from ai.LoadOrCreate).
 // cache backs tool handlers that generate AI responses on first call.
-func New(cfg *config.Config, rec session.Recorder, state *sim.SystemState, name string, cache *ai.ResponseCache, issuer *canary.Issuer, engine *alert.Engine) *server.MCPServer {
+func New(cfg *config.Config, rec session.Recorder, state *sim.SystemState, name string, cache *ai.ResponseCache, issuer *canary.Issuer, engine *alert.Engine, bizTools []ai.ToolDef) *server.MCPServer {
 	hooks := buildHooks(rec, engine)
 	s := server.NewMCPServer(
 		name,
@@ -26,7 +26,7 @@ func New(cfg *config.Config, rec session.Recorder, state *sim.SystemState, name 
 		server.WithHooks(hooks),
 	)
 	s.Use(latencyMiddleware())
-	registerTools(s, cfg, state, cache, issuer)
+	registerTools(s, cfg, state, cache, issuer, bizTools)
 	registerResources(s, cfg)
 	return s
 }
