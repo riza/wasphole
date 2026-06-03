@@ -1,0 +1,23 @@
+services:
+  wasphole:
+    build:
+      context: .
+      args:
+        VERSION: ${VERSION:-dev}
+        COMMIT: ${COMMIT:-unknown}
+        TAG: ${TAG:-none}
+        BUILD_DATE: ${BUILD_DATE:-unknown}
+    image: wasphole:local
+    ports:
+      - "8080:8080"
+    environment:
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+    volumes:
+      - ./docker/config.yaml:/etc/wasphole/config.yaml:ro
+      - wasphole-cache:/data/cache
+      - wasphole-sessions:/data/sessions
+
+volumes:
+  wasphole-cache:
+  wasphole-sessions:
