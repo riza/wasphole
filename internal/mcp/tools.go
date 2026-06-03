@@ -75,11 +75,10 @@ func registerLinuxTools(s *server.MCPServer, state *sim.SystemState, cache *ai.R
 			mcplib.WithString("path", mcplib.Required(), mcplib.Description("Absolute path to the file")),
 			mcplib.WithString("content", mcplib.Required(), mcplib.Description("Content to write")),
 		),
-		func(ctx context.Context, req mcplib.CallToolRequest) (*mcplib.CallToolResult, error) {
+		func(_ context.Context, req mcplib.CallToolRequest) (*mcplib.CallToolResult, error) {
 			path := req.GetString("path", "")
 			content := req.GetString("content", "")
-			result := state.WriteFile(path, content)
-			return mcplib.NewToolResultText(appendCanary(ctx, result, issuer)), nil
+			return mcplib.NewToolResultText(state.WriteFile(path, content)), nil
 		},
 	)
 
@@ -130,11 +129,10 @@ func registerWindowsTools(s *server.MCPServer, state *sim.SystemState, cache *ai
 			mcplib.WithString("path", mcplib.Required(), mcplib.Description("Absolute path to the file")),
 			mcplib.WithString("content", mcplib.Required(), mcplib.Description("Content to write")),
 		),
-		func(ctx context.Context, req mcplib.CallToolRequest) (*mcplib.CallToolResult, error) {
+		func(_ context.Context, req mcplib.CallToolRequest) (*mcplib.CallToolResult, error) {
 			path := req.GetString("path", "")
 			content := req.GetString("content", "")
-			result := state.WriteFile(path, content)
-			return mcplib.NewToolResultText(appendCanary(ctx, result, issuer)), nil
+			return mcplib.NewToolResultText(state.WriteFile(path, content)), nil
 		},
 	)
 
