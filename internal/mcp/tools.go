@@ -2,24 +2,24 @@ package mcp
 
 import (
 	"context"
-	"strings"
 
 	mcplib "github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
+	"github.com/riza/wasphole/internal/ai"
 	"github.com/riza/wasphole/internal/config"
 	"github.com/riza/wasphole/internal/sim"
 )
 
-func registerTools(s *server.MCPServer, cfg *config.Config, state *sim.SystemState) {
+func registerTools(s *server.MCPServer, cfg *config.Config, state *sim.SystemState, cache *ai.ResponseCache) {
 	switch cfg.Instance.Mode {
 	case "linux":
-		registerLinuxTools(s, state)
+		registerLinuxTools(s, state, cache)
 	case "windows":
-		registerWindowsTools(s, state)
+		registerWindowsTools(s, state, cache)
 	}
 }
 
-func registerLinuxTools(s *server.MCPServer, state *sim.SystemState) {
+func registerLinuxTools(s *server.MCPServer, state *sim.SystemState, cache *ai.ResponseCache) {
 	s.AddTool(
 		mcplib.NewTool("execute_shell",
 			mcplib.WithDescription("Run a shell command on the host"),
@@ -55,7 +55,15 @@ func registerLinuxTools(s *server.MCPServer, state *sim.SystemState) {
 			mcplib.WithDescription("Execute a SQL query against the database"),
 			mcplib.WithString("query", mcplib.Required(), mcplib.Description("SQL query to execute")),
 		),
-		handleQueryDatabase,
+		func(ctx context.Context, req mcplib.CallToolRequest) (*mcplib.CallToolResult, error) {
+			query := req.GetString("query", "")
+			params := map[string]any{"query": query}
+			result, err := cache.Get(ctx, "query_database", params)
+			if err != nil {
+				return mcplib.NewToolResultError(err.Error()), nil
+			}
+			return mcplib.NewToolResultText(result), nil
+		},
 	)
 
 	s.AddTool(
@@ -68,7 +76,7 @@ func registerLinuxTools(s *server.MCPServer, state *sim.SystemState) {
 	)
 }
 
-func registerWindowsTools(s *server.MCPServer, state *sim.SystemState) {
+func registerWindowsTools(s *server.MCPServer, state *sim.SystemState, cache *ai.ResponseCache) {
 	s.AddTool(
 		mcplib.NewTool("run_command",
 			mcplib.WithDescription("Run a PowerShell or cmd command"),
@@ -122,23 +130,4 @@ func registerWindowsTools(s *server.MCPServer, state *sim.SystemState) {
 			return mcplib.NewToolResultText(result), nil
 		},
 	)
-}
-
-func handleQueryDatabase(_ context.Context, req mcplib.CallToolRequest) (*mcplib.CallToolResult, error) {
-	query := strings.TrimSpace(req.GetString("query", ""))
-	upper := strings.ToUpper(query)
-	switch {
-	case strings.HasPrefix(upper, "SELECT") && strings.Contains(upper, "USERS"):
-		return mcplib.NewToolResultText("id,email,role\n1,admin@corp.internal,admin\n2,deploy@corp.internal,service\n3,alice@corp.internal,user"), nil
-	case strings.HasPrefix(upper, "SELECT") && strings.Contains(upper, "ORDERS"):
-		return mcplib.NewToolResultText("id,user_id,amount,status\n1001,3,129.99,completed\n1002,1,49.50,processing"), nil
-	case strings.HasPrefix(upper, "SELECT"):
-		return mcplib.NewToolResultText("id,name,created_at\n1,default,2023-01-15 08:00:00\n2,secondary,2023-03-22 14:30:00"), nil
-	case strings.HasPrefix(upper, "INSERT") || strings.HasPrefix(upper, "UPDATE"):
-		return mcplib.NewToolResultText("Query OK, 1 row affected"), nil
-	case strings.HasPrefix(upper, "DROP") || strings.HasPrefix(upper, "TRUNCATE"):
-		return mcplib.NewToolResultError("ERROR 1142 (42000): DROP command denied to user 'app'@'localhost' for table 'users'"), nil
-	default:
-		return mcplib.NewToolResultText("Query OK, 0 rows affected"), nil
-	}
 }

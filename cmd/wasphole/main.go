@@ -55,7 +55,9 @@ func main() {
 		os.Exit(1)
 	}
 
-	srv := mcp.New(cfg, rec, state, identity.ServerName)
+	responseCache := ai.NewResponseCache(aiClient, cacheDir, identity.Persona)
+
+	srv := mcp.New(cfg, rec, state, identity.ServerName, responseCache)
 
 	switch cfg.Transport.Type {
 	case "stdio":
