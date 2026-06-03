@@ -77,12 +77,21 @@ alerts:
     # Webhook sink: POSTs JSON alert payloads to a URL on WARN+ events.
     - type: webhook
       url: https://hooks.example.com/wasphole-alerts
+      # Optional. Base64-encoded HMAC signing secret.
+      # If set, outbound POSTs include webhook-id, webhook-signature, and
+      # webhook-timestamp headers (Standard Webhooks spec).
+      webhook_secret: ""
       enabled: false
 
-    # SIEM sink: emits CEF-formatted events for ingestion by a SIEM.
-    # - type: siem
-    #   format: cef
-    #   enabled: false
+    # SIEM sink: emits structured events for ingestion by a SIEM.
+    # format: "cef"  — ArcSight Common Event Format (CEF:0) written to path or stderr
+    # format: "json" — JSON events written to path or stderr
+    - type: siem
+      format: cef
+      # Output file path. Leave empty to write CEF lines to stderr.
+      # Example: path: /var/log/wasphole/siem.log
+      path: ""
+      enabled: false
 
 # ── Canary ───────────────────────────────────────────────────────────────────
 # Controls canary token embedding and callback delivery.
@@ -96,6 +105,13 @@ canary:
   # Receives session ID, token type, and timestamp.
   # Leave empty to disable HTTP canary callbacks.
   http_callback: https://hooks.example.com/canary
+
+  # Address for the built-in canary HTTP listener.
+  # When set, wasphole serves /c/{token-id} on this address — fired canary tokens
+  # are attributed to their originating session without an external callback.
+  # Leave empty to disable (default).
+  # Example: ":9090"
+  listen_addr: ""
 
 # ── Session Recording ────────────────────────────────────────────────────────
 # Controls where session logs are written.
