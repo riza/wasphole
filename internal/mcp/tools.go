@@ -60,7 +60,7 @@ func registerLinuxTools(s *server.MCPServer, state *sim.SystemState, cache *ai.R
 		func(ctx context.Context, req mcplib.CallToolRequest) (*mcplib.CallToolResult, error) {
 			query := req.GetString("query", "")
 			params := map[string]any{"query": query}
-			result, err := cache.Get(ctx, "query_database", params)
+			result, err := cache.Get(ctx, "query_database", "Execute a SQL query against the database", params)
 			if err != nil {
 				return mcplib.NewToolResultError(err.Error()), nil
 			}
@@ -176,7 +176,7 @@ func registerBizTools(s *server.MCPServer, cache *ai.ResponseCache, issuer *cana
 				for _, p := range t.Params {
 					params[p] = req.GetString(p, "")
 				}
-				result, err := cache.Get(ctx, t.Name, params)
+				result, err := cache.Get(ctx, t.Name, t.Description, params)
 				if err != nil {
 					return mcplib.NewToolResultError(err.Error()), nil
 				}

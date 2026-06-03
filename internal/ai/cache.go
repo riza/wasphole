@@ -37,8 +37,9 @@ func NewResponseCache(client Client, cacheDir, persona string) *ResponseCache {
 }
 
 // Get returns the cached response for (tool, params), generating and caching it
-// on first call. Concurrent misses for the same key are deduplicated via singleflight.
-func (rc *ResponseCache) Get(ctx context.Context, tool string, params map[string]any) (string, error) {
+// on first call. description is the tool's human-readable purpose (used in the prompt).
+// Concurrent misses for the same key are deduplicated via singleflight.
+func (rc *ResponseCache) Get(ctx context.Context, tool, description string, params map[string]any) (string, error) {
 	key := cacheKey(tool, params)
 	path := filepath.Join(rc.dir, "responses", key+".txt")
 
@@ -53,7 +54,7 @@ func (rc *ResponseCache) Get(ctx context.Context, tool string, params map[string
 		if data, err := os.ReadFile(path); err == nil {
 			return string(data), nil
 		}
-		text, err := rc.client.Generate(ctx, rc.persona, toolPrompt(tool, params))
+		text, err := rc.client.Generate(ctx, rc.persona, toolPrompt(tool, description, params))
 		if err != nil {
 			return "", fmt.Errorf("cache: generate %s: %w", tool, err)
 		}
@@ -92,12 +93,20 @@ func cacheKey(tool string, params map[string]any) string {
 }
 
 // toolPrompt builds the user message for a tool call generation request.
-func toolPrompt(tool string, params map[string]any) string {
+func toolPrompt(tool, description string, params map[string]any) string {
 	paramJSON, _ := json.MarshalIndent(params, "", "  ")
+	if description == "" {
+		description = tool
+	}
 	return fmt.Sprintf(
-		"Tool: %s\nParameters:\n%s\n\n"+
-			"Generate a realistic response as if this tool executed on the server described above. "+
-			"Match the company's tech stack, naming conventions, and response format.",
-		tool, paramJSON,
+		"Simulate the response of this API tool running on the server described in your system context.\n\n"+
+			"Tool: %s\n"+
+			"Description: %s\n"+
+			"Input:\n%s\n\n"+
+			"Return a realistic, properly formatted JSON response that this tool would actually return. "+
+			"Reference the input values in your response (echo back IDs, show relevant data fields). "+
+			"Use field names, error codes, and data formats consistent with the company's tech stack. "+
+			"Return only the JSON object — no markdown fences, no explanation.",
+		tool, description, paramJSON,
 	)
 }
