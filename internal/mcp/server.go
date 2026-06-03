@@ -11,13 +11,11 @@ import (
 )
 
 // New constructs an MCPServer pre-wired with hooks for session recording.
-// Tools, resources, and latency middleware are added by plan 02-02.
-// The server name "Internal Tooling Server" is a placeholder replaced by
-// AI-generated identity in Phase 4.
-func New(cfg *config.Config, rec session.Recorder, state *sim.SystemState) *server.MCPServer {
+// name is the AI-generated server identity name (from ai.LoadOrCreate).
+func New(cfg *config.Config, rec session.Recorder, state *sim.SystemState, name string) *server.MCPServer {
 	hooks := buildHooks(rec)
 	s := server.NewMCPServer(
-		"Internal Tooling Server",
+		name,
 		"1.0.0",
 		server.WithToolCapabilities(false),
 		server.WithResourceCapabilities(false, false),

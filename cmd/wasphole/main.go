@@ -1,12 +1,14 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"log"
 	"os"
 
 	mcpserver "github.com/mark3labs/mcp-go/server"
+	"github.com/riza/wasphole/internal/ai"
 	"github.com/riza/wasphole/internal/config"
 	"github.com/riza/wasphole/internal/mcp"
 	"github.com/riza/wasphole/internal/session"
@@ -35,7 +37,25 @@ func main() {
 		os.Exit(1)
 	}
 
-	srv := mcp.New(cfg, rec, state)
+	cacheDir := cfg.AI.CacheDir
+	if cacheDir == "" {
+		cacheDir = "./cache"
+	}
+
+	aiClient, err := ai.NewClient(cfg.AI)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: ai init: %v\n", err)
+		os.Exit(1)
+	}
+
+	ctx := context.Background()
+	identity, err := ai.LoadOrCreate(ctx, aiClient, cacheDir, cfg.Instance)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: identity: %v\n", err)
+		os.Exit(1)
+	}
+
+	srv := mcp.New(cfg, rec, state, identity.ServerName)
 
 	switch cfg.Transport.Type {
 	case "stdio":
