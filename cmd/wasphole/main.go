@@ -17,20 +17,35 @@ const banner = `
 
 `
 
-func main() {
-	fmt.Fprint(os.Stderr, banner)
+var (
+	version   = "dev"
+	commit    = "unknown"
+	tag       = "none"
+	buildDate = "unknown"
+)
 
+func main() {
 	log.Logger = zerolog.New(
 		zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: time.RFC3339},
 	).With().Timestamp().Logger()
 
 	if len(os.Args) < 2 {
-		fmt.Fprintln(os.Stderr, "Usage:\n  wasphole server    [-config file]         run the honeypot server\n  wasphole sessions  [-dir ./sessions]       list recorded sessions\n  wasphole replay    <id> [-dir ./sessions]  show session timeline")
+		fmt.Fprint(os.Stderr, banner)
+		printBuildInfo(os.Stderr)
+		printUsage(os.Stderr)
 		os.Exit(1)
 	}
 
 	sub := os.Args[1]
 	os.Args = append(os.Args[:1], os.Args[2:]...)
+
+	if sub == "version" {
+		printBuildInfo(os.Stdout)
+		return
+	}
+
+	fmt.Fprint(os.Stderr, banner)
+	printBuildInfo(os.Stderr)
 
 	switch sub {
 	case "server":
@@ -40,7 +55,16 @@ func main() {
 	case "replay":
 		runReplay()
 	default:
-		fmt.Fprintf(os.Stderr, "unknown command %q\n\nUsage:\n  wasphole server    [-config file]         run the honeypot server\n  wasphole sessions  [-dir ./sessions]       list recorded sessions\n  wasphole replay    <id> [-dir ./sessions]  show session timeline\n", sub)
+		fmt.Fprintf(os.Stderr, "unknown command %q\n\n", sub)
+		printUsage(os.Stderr)
 		os.Exit(1)
 	}
+}
+
+func printBuildInfo(out *os.File) {
+	fmt.Fprintf(out, "version=%s commit=%s tag=%s build_date=%s\n\n", version, commit, tag, buildDate)
+}
+
+func printUsage(out *os.File) {
+	fmt.Fprintln(out, "Usage:\n  wasphole server    [-config file]         run the honeypot server\n  wasphole sessions  [-dir ./sessions]       list recorded sessions\n  wasphole replay    <id> [-dir ./sessions]  show session timeline\n  wasphole version                         show build metadata")
 }
