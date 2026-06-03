@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -25,13 +24,13 @@ func main() {
 		zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: time.RFC3339},
 	).With().Timestamp().Logger()
 
-	// Subcommand dispatch.
-	// Backward-compat: "wasphole -config x.yaml" still runs the server.
-	sub := "server"
-	if len(os.Args) > 1 && !strings.HasPrefix(os.Args[1], "-") {
-		sub = os.Args[1]
-		os.Args = append(os.Args[:1], os.Args[2:]...)
+	if len(os.Args) < 2 {
+		fmt.Fprintln(os.Stderr, "Usage:\n  wasphole server    [-config file]         run the honeypot server\n  wasphole sessions  [-dir ./sessions]       list recorded sessions\n  wasphole replay    <id> [-dir ./sessions]  show session timeline")
+		os.Exit(1)
 	}
+
+	sub := os.Args[1]
+	os.Args = append(os.Args[:1], os.Args[2:]...)
 
 	switch sub {
 	case "server":
@@ -41,7 +40,7 @@ func main() {
 	case "replay":
 		runReplay()
 	default:
-		fmt.Fprintf(os.Stderr, "unknown command %q\n\nUsage:\n  wasphole server    [-config file]    run the honeypot server\n  wasphole sessions  [-dir ./sessions]  list recorded sessions\n  wasphole replay    <id> [-dir ./sessions]  show session timeline\n", sub)
+		fmt.Fprintf(os.Stderr, "unknown command %q\n\nUsage:\n  wasphole server    [-config file]         run the honeypot server\n  wasphole sessions  [-dir ./sessions]       list recorded sessions\n  wasphole replay    <id> [-dir ./sessions]  show session timeline\n", sub)
 		os.Exit(1)
 	}
 }
