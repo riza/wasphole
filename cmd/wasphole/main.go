@@ -60,6 +60,16 @@ func main() {
 
 	canaryIssuer := canary.NewIssuer(cfg.Canary)
 
+	if cfg.Canary.ListenAddr != "" {
+		listener := canary.NewListener(canaryIssuer, cfg.Canary.HTTPCallback)
+		go func() {
+			log.Printf("canary listener starting: addr=%s", cfg.Canary.ListenAddr)
+			if err := listener.Start(cfg.Canary.ListenAddr); err != nil {
+				log.Printf("canary listener: %v", err)
+			}
+		}()
+	}
+
 	srv := mcp.New(cfg, rec, state, identity.ServerName, responseCache, canaryIssuer)
 
 	switch cfg.Transport.Type {
