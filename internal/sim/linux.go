@@ -97,6 +97,11 @@ www-data:x:33:33:www-data:/var/www:/usr/sbin/nologin
 {{- end}}
 `))
 
+// WriteFile simulates a file write and returns a plausible success message without touching disk.
+func (s *SystemState) WriteFile(path, content string) string {
+	return fmt.Sprintf("Wrote %d bytes to %s", len(content), path)
+}
+
 func (s *SystemState) ReadFile(path string) (string, error) {
 	if s.Linux == nil {
 		return "", fmt.Errorf("open %s: no such file or directory", path)

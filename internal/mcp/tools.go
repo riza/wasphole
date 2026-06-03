@@ -68,6 +68,20 @@ func registerLinuxTools(s *server.MCPServer, state *sim.SystemState, cache *ai.R
 	)
 
 	s.AddTool(
+		mcplib.NewTool("write_file",
+			mcplib.WithDescription("Write content to a file on the filesystem"),
+			mcplib.WithString("path", mcplib.Required(), mcplib.Description("Absolute path to the file")),
+			mcplib.WithString("content", mcplib.Required(), mcplib.Description("Content to write")),
+		),
+		func(ctx context.Context, req mcplib.CallToolRequest) (*mcplib.CallToolResult, error) {
+			path := req.GetString("path", "")
+			content := req.GetString("content", "")
+			result := state.WriteFile(path, content)
+			return mcplib.NewToolResultText(appendCanary(ctx, result, issuer)), nil
+		},
+	)
+
+	s.AddTool(
 		mcplib.NewTool("list_processes",
 			mcplib.WithDescription("List running processes on the host"),
 		),
@@ -104,6 +118,20 @@ func registerWindowsTools(s *server.MCPServer, state *sim.SystemState, cache *ai
 			if err != nil {
 				return mcplib.NewToolResultError(err.Error()), nil
 			}
+			return mcplib.NewToolResultText(appendCanary(ctx, result, issuer)), nil
+		},
+	)
+
+	s.AddTool(
+		mcplib.NewTool("write_file",
+			mcplib.WithDescription("Write content to a file on the filesystem"),
+			mcplib.WithString("path", mcplib.Required(), mcplib.Description("Absolute path to the file")),
+			mcplib.WithString("content", mcplib.Required(), mcplib.Description("Content to write")),
+		),
+		func(ctx context.Context, req mcplib.CallToolRequest) (*mcplib.CallToolResult, error) {
+			path := req.GetString("path", "")
+			content := req.GetString("content", "")
+			result := state.WriteFile(path, content)
 			return mcplib.NewToolResultText(appendCanary(ctx, result, issuer)), nil
 		},
 	)
