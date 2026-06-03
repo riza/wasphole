@@ -12,7 +12,7 @@ func New(cfg *config.Config) (*SystemState, error) {
 	fake := gofakeit.New(seedInt64(cfg.Instance.Seed))
 
 	statePath := filepath.Join(cfg.AI.CacheDir, "sim_state.json")
-	persisted, err := loadOrCreatePersisted(statePath, fake)
+	persisted, err := loadOrCreatePersisted(statePath, cfg.Instance.Seed)
 	if err != nil {
 		return nil, err
 	}

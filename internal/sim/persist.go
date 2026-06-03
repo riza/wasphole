@@ -10,6 +10,12 @@ import (
 	"github.com/google/uuid"
 )
 
+// persistSeed returns a seed for the persistence-only faker, isolated from the main faker.
+// This ensures loadOrCreatePersisted never affects the main faker's call sequence.
+func persistSeed(mainSeed string) int64 {
+	return seedInt64(mainSeed + ":persist")
+}
+
 // PersistedState holds values that must survive process restarts.
 type PersistedState struct {
 	BootTime  time.Time `json:"boot_time"`
@@ -18,7 +24,9 @@ type PersistedState struct {
 
 // loadOrCreatePersisted reads an existing sim_state.json or generates fresh values.
 // On first run (or any parse error), a new BootTime and MachineID are generated and saved.
-func loadOrCreatePersisted(path string, fake *gofakeit.Faker) (*PersistedState, error) {
+// Uses a separate faker (isolated from the main faker) so the main faker's call sequence
+// is unaffected regardless of whether the file exists.
+func loadOrCreatePersisted(path string, seed string) (*PersistedState, error) {
 	data, err := os.ReadFile(path)
 	if err == nil {
 		var p PersistedState
@@ -27,6 +35,7 @@ func loadOrCreatePersisted(path string, fake *gofakeit.Faker) (*PersistedState, 
 		}
 	}
 
+	fake := gofakeit.New(persistSeed(seed))
 	p := &PersistedState{
 		BootTime:  generateBootTime(fake),
 		MachineID: uuid.New().String(),
