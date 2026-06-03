@@ -4,21 +4,21 @@ import (
 	"context"
 	"fmt"
 	"strings"
-	"time"
 
 	mcplib "github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
+	"github.com/riza/wasphole/internal/ai"
 	"github.com/riza/wasphole/internal/config"
 	"github.com/riza/wasphole/internal/sim"
 )
 
-func registerResources(s *server.MCPServer, cfg *config.Config, state *sim.SystemState, serverName string) {
+func registerResources(s *server.MCPServer, cfg *config.Config, state *sim.SystemState, serverName string, cache *ai.ResponseCache) {
 	slug := companySlug(serverName)
 	switch cfg.Instance.Mode {
 	case "linux":
-		registerLinuxResources(s, state, slug)
+		registerLinuxResources(s, state, slug, cache)
 	case "windows":
-		registerWindowsResources(s, state, slug)
+		registerWindowsResources(s, state, slug, cache)
 	}
 }
 
@@ -31,12 +31,11 @@ func companySlug(serverName string) string {
 	return strings.SplitN(serverName, "-", 2)[0]
 }
 
-func registerLinuxResources(s *server.MCPServer, state *sim.SystemState, slug string) {
+func registerLinuxResources(s *server.MCPServer, state *sim.SystemState, slug string, cache *ai.ResponseCache) {
 	hostname := state.Hostname
 	dbHost := fmt.Sprintf("db01.%s.internal", slug)
 	redisHost := fmt.Sprintf("redis.%s.internal", slug)
 	dbName := slug + "_production"
-	ts := time.Now().UTC().Format("2006-01-02T15:04:05Z")
 
 	s.AddResource(
 		mcplib.NewResource("file:///etc/config.yaml", "Application configuration",
@@ -73,26 +72,16 @@ func registerLinuxResources(s *server.MCPServer, state *sim.SystemState, slug st
 			mcplib.WithMIMEType("text/plain"),
 			mcplib.WithResourceDescription("Recent application log entries"),
 		),
-		func(_ context.Context, req mcplib.ReadResourceRequest) ([]mcplib.ResourceContents, error) {
+		func(ctx context.Context, req mcplib.ReadResourceRequest) ([]mcplib.ResourceContents, error) {
+			text, err := cache.Get(ctx, "read_app_log",
+				"Recent application log file (last 20 lines) showing startup, requests, warnings, and errors",
+				map[string]any{"host": hostname, "db_host": dbHost, "db_name": dbName},
+			)
+			if err != nil {
+				text = fmt.Sprintf("ERROR: could not read log: %v\n", err)
+			}
 			return []mcplib.ResourceContents{
-				mcplib.TextResourceContents{
-					URI:      req.Params.URI,
-					MIMEType: "text/plain",
-					Text: fmt.Sprintf(
-						"%s INFO  Starting application server host=%s port=8080\n"+
-							"%s INFO  Database connection established host=%s db=%s\n"+
-							"%s WARN  Slow query detected duration=2345ms query=SELECT_orders\n"+
-							"%s INFO  Request processed path=/api/v2/orders status=200\n"+
-							"%s ERROR Failed to send notification smtp_error=\"connection refused\"\n"+
-							"%s INFO  Health check OK uptime=8m\n",
-						ts, hostname,
-						ts, dbHost, dbName,
-						ts,
-						ts,
-						ts,
-						ts,
-					),
-				},
+				mcplib.TextResourceContents{URI: req.Params.URI, MIMEType: "text/plain", Text: text},
 			}, nil
 		},
 	)
@@ -114,11 +103,10 @@ func registerLinuxResources(s *server.MCPServer, state *sim.SystemState, slug st
 	)
 }
 
-func registerWindowsResources(s *server.MCPServer, state *sim.SystemState, slug string) {
+func registerWindowsResources(s *server.MCPServer, state *sim.SystemState, slug string, cache *ai.ResponseCache) {
 	hostname := state.Hostname
 	sqlHost := fmt.Sprintf("sql01.%s.internal", slug)
 	dbName := slug + "DB"
-	ts := time.Now().UTC().Format("2006-01-02 15:04:05")
 
 	s.AddResource(
 		mcplib.NewResource("file:///C:/config/app.config", "Application configuration",
@@ -153,24 +141,16 @@ func registerWindowsResources(s *server.MCPServer, state *sim.SystemState, slug 
 			mcplib.WithMIMEType("text/plain"),
 			mcplib.WithResourceDescription("Recent Windows application log entries"),
 		),
-		func(_ context.Context, req mcplib.ReadResourceRequest) ([]mcplib.ResourceContents, error) {
+		func(ctx context.Context, req mcplib.ReadResourceRequest) ([]mcplib.ResourceContents, error) {
+			text, err := cache.Get(ctx, "read_app_log_windows",
+				"Recent Windows application event log (last 20 entries) showing startup, requests, warnings, and errors",
+				map[string]any{"host": hostname, "sql_host": sqlHost, "db_name": dbName},
+			)
+			if err != nil {
+				text = fmt.Sprintf("ERROR: could not read log: %v\r\n", err)
+			}
 			return []mcplib.ResourceContents{
-				mcplib.TextResourceContents{
-					URI:      req.Params.URI,
-					MIMEType: "text/plain",
-					Text: fmt.Sprintf(
-						"%s [Information] Application started on %s\r\n"+
-							"%s [Information] Connected to %s database=%s\r\n"+
-							"%s [Warning] High memory usage: 78%%\r\n"+
-							"%s [Error] SMTP relay unavailable: Connection timed out\r\n"+
-							"%s [Information] Scheduled task completed: backup\r\n",
-						ts, hostname,
-						ts, sqlHost, dbName,
-						ts,
-						ts,
-						ts,
-					),
-				},
+				mcplib.TextResourceContents{URI: req.Params.URI, MIMEType: "text/plain", Text: text},
 			}, nil
 		},
 	)

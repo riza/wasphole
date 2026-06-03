@@ -27,7 +27,7 @@ func New(cfg *config.Config, rec session.Recorder, state *sim.SystemState, name 
 	)
 	s.Use(latencyMiddleware())
 	registerTools(s, cfg, state, cache, issuer, bizTools)
-	registerResources(s, cfg, state, name)
+	registerResources(s, cfg, state, name, cache)
 	return s
 }
 
