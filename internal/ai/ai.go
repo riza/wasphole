@@ -62,14 +62,12 @@ func (c *anthropicClient) Generate(ctx context.Context, system, user string) (st
 	if err != nil {
 		return "", err
 	}
-	if len(msg.Content) == 0 {
-		return "", fmt.Errorf("anthropic: empty response")
+	for _, block := range msg.Content {
+		if block.Type == "text" {
+			return block.Text, nil
+		}
 	}
-	block := msg.Content[0]
-	if block.Type != "text" {
-		return "", fmt.Errorf("anthropic: unexpected content type %q", block.Type)
-	}
-	return block.Text, nil
+	return "", fmt.Errorf("anthropic: no text block in response")
 }
 
 // --- OpenAI-compatible -------------------------------------------------------
