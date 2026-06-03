@@ -2,6 +2,9 @@ package sim
 
 import (
 	"hash/fnv"
+	"sort"
+	"strings"
+	"sync"
 	"time"
 )
 
@@ -14,6 +17,52 @@ type SystemState struct {
 	MachineID string
 	Linux     *LinuxState
 	Windows   *WindowsState
+
+	writeMu      sync.RWMutex
+	writtenFiles map[string]string // path → content, populated by WriteFile
+}
+
+func (s *SystemState) storeWritten(path, content string) {
+	s.writeMu.Lock()
+	defer s.writeMu.Unlock()
+	if s.writtenFiles == nil {
+		s.writtenFiles = make(map[string]string)
+	}
+	s.writtenFiles[path] = content
+}
+
+func (s *SystemState) lookupWritten(path string) (string, bool) {
+	s.writeMu.RLock()
+	defer s.writeMu.RUnlock()
+	if s.writtenFiles == nil {
+		return "", false
+	}
+	c, ok := s.writtenFiles[path]
+	return c, ok
+}
+
+// writtenInDir returns newline-joined names of files written directly under dir.
+func (s *SystemState) writtenInDir(dir string) string {
+	s.writeMu.RLock()
+	defer s.writeMu.RUnlock()
+	if s.writtenFiles == nil {
+		return ""
+	}
+	prefix := strings.TrimSuffix(dir, "/") + "/"
+	var names []string
+	for p := range s.writtenFiles {
+		if strings.HasPrefix(p, prefix) {
+			name := strings.TrimPrefix(p, prefix)
+			if name != "" && !strings.Contains(name, "/") {
+				names = append(names, name)
+			}
+		}
+	}
+	if len(names) == 0 {
+		return ""
+	}
+	sort.Strings(names)
+	return strings.Join(names, "\n") + "\n"
 }
 
 type LinuxState struct {

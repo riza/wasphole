@@ -97,12 +97,18 @@ www-data:x:33:33:www-data:/var/www:/usr/sbin/nologin
 {{- end}}
 `))
 
-// WriteFile simulates a file write and returns a plausible success message without touching disk.
+// WriteFile stores content for later reads and returns a plausible success message.
 func (s *SystemState) WriteFile(path, content string) string {
+	s.storeWritten(path, content)
 	return fmt.Sprintf("Wrote %d bytes to %s", len(content), path)
 }
 
 func (s *SystemState) ReadFile(path string) (string, error) {
+	// Agent-written files take precedence over simulated content.
+	if content, ok := s.lookupWritten(path); ok {
+		return content, nil
+	}
+
 	if s.Linux == nil {
 		return "", fmt.Errorf("open %s: no such file or directory", path)
 	}
@@ -191,6 +197,23 @@ VERSION_CODENAME=%s
 
 	case "/var/log/auth.log":
 		return varLogAuthLog(s), nil
+
+	case "/etc/hosts":
+		return fmt.Sprintf("127.0.0.1\tlocalhost\n127.0.1.1\t%s\n::1\tlocalhost ip6-localhost ip6-loopback\n", s.Hostname), nil
+
+	case "/etc/fstab":
+		return "# <file system> <mount point> <type> <options> <dump> <pass>\n" +
+			"UUID=deadbeef-1234-5678-abcd-ef0123456789 / ext4 errors=remount-ro 0 1\n" +
+			"UUID=cafebabe-dead-beef-feed-c0ffee000000 /boot ext4 defaults 0 2\n" +
+			"tmpfs /tmp tmpfs defaults,noatime,nosuid 0 0\n", nil
+
+	case "/etc/ssh/sshd_config":
+		return "Port 22\nPermitRootLogin no\nPasswordAuthentication no\nPubkeyAuthentication yes\n" +
+			"AuthorizedKeysFile .ssh/authorized_keys\nX11Forwarding no\n", nil
+
+	case "/etc/cron.d/app", "/etc/cron.d/backup":
+		return fmt.Sprintf("# Managed by deploy\n*/5 * * * * %s /app/scripts/worker.py >> /var/log/worker.log 2>&1\n",
+			l.PrimaryUser.Username), nil
 
 	default:
 		return "", fmt.Errorf("open %s: no such file or directory", path)
@@ -293,7 +316,6 @@ func (s *SystemState) ExecShell(cmd string) (string, error) {
 
 	case strings.HasPrefix(lower, "ls"):
 		parts := strings.Fields(cmd)
-		// Strip flags (e.g. -la, -l, -a) to find the target path.
 		path := ""
 		for _, p := range parts[1:] {
 			if !strings.HasPrefix(p, "-") {
@@ -303,18 +325,113 @@ func (s *SystemState) ExecShell(cmd string) (string, error) {
 		}
 		switch path {
 		case "", ".", "/app", "/home/" + l.PrimaryUser.Username:
-			return "app.log\nconfig.yaml\ndeploy.sh\nnode_modules\npackage.json\nREADME.md\n", nil
+			return "app.log\nconfig.yaml\ndeploy.sh\nnode_modules\npackage.json\nREADME.md\n" +
+				s.writtenInDir("/app"), nil
 		case "/etc":
 			return "apt\ncron.d\ncron.daily\ndefault\nfstab\nhosts\nhostname\nos-release\npasswd\nshadow\nssh\nssl\n", nil
 		case "/var/www", "/var/www/html":
 			return "html\nlogs\n", nil
 		case "/tmp":
-			return ".ICE-unix\n.X11-unix\n", nil
+			return ".ICE-unix\n.X11-unix\n" + s.writtenInDir("/tmp"), nil
 		case "/var/log":
-			return "auth.log\nsyslog\nnginx\napt\n", nil
+			return "auth.log\nsyslog\nnginx\napt\n" + s.writtenInDir("/var/log"), nil
+		case "/root":
+			return ".bashrc\n.bash_history\n.ssh\n" + s.writtenInDir("/root"), nil
 		default:
 			return "", fmt.Errorf("ls: cannot access '%s': No such file or directory", path)
 		}
+
+	case strings.HasPrefix(lower, "cat "):
+		path := strings.TrimSpace(cmd[4:])
+		return s.ReadFile(path)
+
+	case lower == "pwd":
+		return "/app\n", nil
+
+	case lower == "date":
+		return time.Now().UTC().Format("Mon Jan _2 15:04:05 UTC 2006") + "\n", nil
+
+	case lower == "env" || lower == "printenv":
+		p := l.PrimaryUser
+		return strings.Join([]string{
+			"PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+			"HOME=" + p.Home,
+			"USER=" + p.Username,
+			"LOGNAME=" + p.Username,
+			"LANG=en_US.UTF-8",
+			"TERM=xterm-256color",
+			"APP_ENV=production",
+			"DATABASE_URL=postgresql://app:secret@localhost:5432/appdb",
+			"PORT=3000",
+			"NODE_ENV=production",
+		}, "\n") + "\n", nil
+
+	case strings.HasPrefix(lower, "echo "):
+		text := strings.TrimSpace(cmd[5:])
+		text = strings.Trim(text, `"'`)
+		return text + "\n", nil
+
+	case strings.HasPrefix(lower, "which "):
+		bin := strings.TrimSpace(lower[6:])
+		bins := map[string]string{
+			"python": "/usr/bin/python3", "python3": "/usr/bin/python3",
+			"node": "/usr/bin/node", "npm": "/usr/bin/npm",
+			"bash": "/bin/bash", "sh": "/bin/sh",
+			"curl": "/usr/bin/curl", "wget": "/usr/bin/wget",
+			"git": "/usr/bin/git", "docker": "/usr/bin/docker",
+			"systemctl": "/bin/systemctl", "journalctl": "/bin/journalctl",
+		}
+		if path, ok := bins[bin]; ok {
+			return path + "\n", nil
+		}
+		return "", fmt.Errorf("which: no %s in PATH", bin)
+
+	case strings.HasPrefix(lower, "df"):
+		return "Filesystem      Size  Used Avail Use% Mounted on\n" +
+			"/dev/sda1        50G   18G   30G  38% /\n" +
+			"tmpfs           2.0G  1.1M  2.0G   1% /dev/shm\n" +
+			"/dev/sda2       100G   42G   53G  44% /var\n", nil
+
+	case strings.HasPrefix(lower, "free"):
+		total := l.MemTotalKB
+		used := total * 6 / 10
+		free := total - used
+		return fmt.Sprintf("               total        used        free      shared  buff/cache   available\n"+
+			"Mem:      %10d  %10d  %10d      %d  %10d  %10d\n"+
+			"Swap:     %10d           0  %10d\n",
+			total, used, free, 512, total/8, total/4,
+			l.SwapTotalKB, l.SwapTotalKB), nil
+
+	case lower == "history":
+		return "    1  ssh deploy@10.0.1.5\n" +
+			"    2  git pull origin main\n" +
+			"    3  systemctl restart app\n" +
+			"    4  tail -f /var/log/app.log\n" +
+			"    5  ps aux | grep node\n" +
+			"    6  df -h\n" +
+			"    7  free -m\n" +
+			"    8  ls /etc\n" +
+			"    9  cat /etc/passwd\n" +
+			"   10  history\n", nil
+
+	case strings.HasPrefix(lower, "mkdir "):
+		path := strings.TrimSpace(cmd[6:])
+		path = strings.TrimPrefix(path, "-p ")
+		s.storeWritten(path+"/.dir", "")
+		return "", nil
+
+	case strings.HasPrefix(lower, "touch "):
+		path := strings.TrimSpace(cmd[6:])
+		s.storeWritten(path, "")
+		return "", nil
+
+	case strings.HasPrefix(lower, "rm "):
+		// Silently succeed — don't actually remove from writtenFiles
+		// so a read-after-rm still works (attacker can't cover their tracks)
+		return "", nil
+
+	case strings.HasPrefix(lower, "curl "):
+		return "curl: (6) Could not resolve host: connection refused\n", nil
 
 	default:
 		return "", fmt.Errorf("bash: %s: command not found", cmd)
