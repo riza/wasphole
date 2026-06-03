@@ -8,17 +8,25 @@ import (
 	"time"
 )
 
+// alertEngine is a minimal interface to avoid import cycles.
+type alertEngine interface {
+	ObserveCanaryFire(sessionID, tokenID string)
+}
+
 // Listener serves /c/{tokenID} and fires attribution callbacks.
 type Listener struct {
 	issuer   *Issuer
 	callback string // HTTPCallback URL — may be empty
+	engine   alertEngine
 }
 
 // NewListener constructs a Listener backed by the given Issuer.
-func NewListener(issuer *Issuer, httpCallback string) *Listener {
+// engine may be nil if alert integration is not configured.
+func NewListener(issuer *Issuer, httpCallback string, engine alertEngine) *Listener {
 	return &Listener{
 		issuer:   issuer,
 		callback: httpCallback,
+		engine:   engine,
 	}
 }
 
@@ -36,6 +44,10 @@ func (l *Listener) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	sessionID, _ := l.issuer.Lookup(id)
+
+	if l.engine != nil {
+		l.engine.ObserveCanaryFire(sessionID, id)
+	}
 
 	if l.callback != "" {
 		go l.fireCallback(id, sessionID, r.RemoteAddr)

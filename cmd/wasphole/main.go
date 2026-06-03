@@ -61,7 +61,7 @@ func main() {
 	canaryIssuer := canary.NewIssuer(cfg.Canary)
 
 	if cfg.Canary.ListenAddr != "" {
-		listener := canary.NewListener(canaryIssuer, cfg.Canary.HTTPCallback)
+		listener := canary.NewListener(canaryIssuer, cfg.Canary.HTTPCallback, nil) // engine wired in plan 06-02
 		go func() {
 			log.Printf("canary listener starting: addr=%s", cfg.Canary.ListenAddr)
 			if err := listener.Start(cfg.Canary.ListenAddr); err != nil {
@@ -70,7 +70,7 @@ func main() {
 		}()
 	}
 
-	srv := mcp.New(cfg, rec, state, identity.ServerName, responseCache, canaryIssuer)
+	srv := mcp.New(cfg, rec, state, identity.ServerName, responseCache, canaryIssuer, nil) // engine wired in plan 06-02
 
 	switch cfg.Transport.Type {
 	case "stdio":
