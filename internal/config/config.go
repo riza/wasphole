@@ -59,6 +59,7 @@ type AlertSink struct {
 type CanaryConfig struct {
 	Domain       string `yaml:"domain"`        // DNS canary base domain, e.g. "canary.example.com"
 	HTTPCallback string `yaml:"http_callback"` // URL to POST when a canary fires
+	ListenAddr   string `yaml:"listen_addr"`   // address for the canary HTTP listener, e.g. ":9090"
 }
 
 // SessionConfig controls session recording (SR-01, SR-06).
