@@ -291,20 +291,30 @@ func (s *SystemState) ExecShell(cmd string) (string, error) {
 	case strings.HasPrefix(lower, "ps"):
 		return s.ListProcesses(), nil
 
-	case cmd == "ls /etc":
-		return "apt\ncron.d\ncron.daily\ndefault\nfstab\nhosts\nhostname\nos-release\npasswd\nshadow\nssh\nssl\n", nil
-
-	case cmd == "ls /var/www":
-		return "html\nlogs\n", nil
-
 	case strings.HasPrefix(lower, "ls"):
-		// Extract path from command
 		parts := strings.Fields(cmd)
+		// Strip flags (e.g. -la, -l, -a) to find the target path.
 		path := ""
-		if len(parts) > 1 {
-			path = parts[len(parts)-1]
+		for _, p := range parts[1:] {
+			if !strings.HasPrefix(p, "-") {
+				path = p
+				break
+			}
 		}
-		return "", fmt.Errorf("ls: cannot access '%s': No such file or directory", path)
+		switch path {
+		case "", ".", "/app", "/home/" + l.PrimaryUser.Username:
+			return "app.log\nconfig.yaml\ndeploy.sh\nnode_modules\npackage.json\nREADME.md\n", nil
+		case "/etc":
+			return "apt\ncron.d\ncron.daily\ndefault\nfstab\nhosts\nhostname\nos-release\npasswd\nshadow\nssh\nssl\n", nil
+		case "/var/www", "/var/www/html":
+			return "html\nlogs\n", nil
+		case "/tmp":
+			return ".ICE-unix\n.X11-unix\n", nil
+		case "/var/log":
+			return "auth.log\nsyslog\nnginx\napt\n", nil
+		default:
+			return "", fmt.Errorf("ls: cannot access '%s': No such file or directory", path)
+		}
 
 	default:
 		return "", fmt.Errorf("bash: %s: command not found", cmd)
