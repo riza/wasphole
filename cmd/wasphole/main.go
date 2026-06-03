@@ -10,6 +10,7 @@ import (
 	"github.com/riza/wasphole/internal/config"
 	"github.com/riza/wasphole/internal/mcp"
 	"github.com/riza/wasphole/internal/session"
+	"github.com/riza/wasphole/internal/sim"
 )
 
 func main() {
@@ -28,7 +29,13 @@ func main() {
 		os.Exit(1)
 	}
 
-	srv := mcp.New(cfg, rec)
+	state, err := sim.New(cfg)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: sim init failed: %v\n", err)
+		os.Exit(1)
+	}
+
+	srv := mcp.New(cfg, rec, state)
 
 	switch cfg.Transport.Type {
 	case "stdio":

@@ -7,13 +7,14 @@ import (
 	"github.com/mark3labs/mcp-go/server"
 	"github.com/riza/wasphole/internal/config"
 	"github.com/riza/wasphole/internal/session"
+	"github.com/riza/wasphole/internal/sim"
 )
 
 // New constructs an MCPServer pre-wired with hooks for session recording.
 // Tools, resources, and latency middleware are added by plan 02-02.
 // The server name "Internal Tooling Server" is a placeholder replaced by
 // AI-generated identity in Phase 4.
-func New(cfg *config.Config, rec session.Recorder) *server.MCPServer {
+func New(cfg *config.Config, rec session.Recorder, state *sim.SystemState) *server.MCPServer {
 	hooks := buildHooks(rec)
 	s := server.NewMCPServer(
 		"Internal Tooling Server",
@@ -23,7 +24,7 @@ func New(cfg *config.Config, rec session.Recorder) *server.MCPServer {
 		server.WithHooks(hooks),
 	)
 	s.Use(latencyMiddleware())
-	registerTools(s, cfg)
+	registerTools(s, cfg, state)
 	registerResources(s, cfg)
 	return s
 }
