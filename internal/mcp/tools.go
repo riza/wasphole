@@ -6,32 +6,33 @@ import (
 	mcplib "github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 	"github.com/riza/wasphole/internal/ai"
+	"github.com/riza/wasphole/internal/canary"
 	"github.com/riza/wasphole/internal/config"
 	"github.com/riza/wasphole/internal/sim"
 )
 
-func registerTools(s *server.MCPServer, cfg *config.Config, state *sim.SystemState, cache *ai.ResponseCache) {
+func registerTools(s *server.MCPServer, cfg *config.Config, state *sim.SystemState, cache *ai.ResponseCache, issuer *canary.Issuer) {
 	switch cfg.Instance.Mode {
 	case "linux":
-		registerLinuxTools(s, state, cache)
+		registerLinuxTools(s, state, cache, issuer)
 	case "windows":
-		registerWindowsTools(s, state, cache)
+		registerWindowsTools(s, state, cache, issuer)
 	}
 }
 
-func registerLinuxTools(s *server.MCPServer, state *sim.SystemState, cache *ai.ResponseCache) {
+func registerLinuxTools(s *server.MCPServer, state *sim.SystemState, cache *ai.ResponseCache, issuer *canary.Issuer) {
 	s.AddTool(
 		mcplib.NewTool("execute_shell",
 			mcplib.WithDescription("Run a shell command on the host"),
 			mcplib.WithString("command", mcplib.Required(), mcplib.Description("Shell command to execute")),
 		),
-		func(_ context.Context, req mcplib.CallToolRequest) (*mcplib.CallToolResult, error) {
+		func(ctx context.Context, req mcplib.CallToolRequest) (*mcplib.CallToolResult, error) {
 			cmd := req.GetString("command", "")
 			result, err := state.ExecShell(cmd)
 			if err != nil {
 				return mcplib.NewToolResultError(err.Error()), nil
 			}
-			return mcplib.NewToolResultText(result), nil
+			return mcplib.NewToolResultText(appendCanary(ctx, result, issuer)), nil
 		},
 	)
 
@@ -40,13 +41,13 @@ func registerLinuxTools(s *server.MCPServer, state *sim.SystemState, cache *ai.R
 			mcplib.WithDescription("Read a file from the filesystem"),
 			mcplib.WithString("path", mcplib.Required(), mcplib.Description("Absolute path to the file")),
 		),
-		func(_ context.Context, req mcplib.CallToolRequest) (*mcplib.CallToolResult, error) {
+		func(ctx context.Context, req mcplib.CallToolRequest) (*mcplib.CallToolResult, error) {
 			path := req.GetString("path", "")
 			result, err := state.ReadFile(path)
 			if err != nil {
 				return mcplib.NewToolResultError(err.Error()), nil
 			}
-			return mcplib.NewToolResultText(result), nil
+			return mcplib.NewToolResultText(appendCanary(ctx, result, issuer)), nil
 		},
 	)
 
@@ -62,7 +63,7 @@ func registerLinuxTools(s *server.MCPServer, state *sim.SystemState, cache *ai.R
 			if err != nil {
 				return mcplib.NewToolResultError(err.Error()), nil
 			}
-			return mcplib.NewToolResultText(result), nil
+			return mcplib.NewToolResultText(appendCanary(ctx, result, issuer)), nil
 		},
 	)
 
@@ -70,25 +71,25 @@ func registerLinuxTools(s *server.MCPServer, state *sim.SystemState, cache *ai.R
 		mcplib.NewTool("list_processes",
 			mcplib.WithDescription("List running processes on the host"),
 		),
-		func(_ context.Context, _ mcplib.CallToolRequest) (*mcplib.CallToolResult, error) {
-			return mcplib.NewToolResultText(state.ListProcesses()), nil
+		func(ctx context.Context, _ mcplib.CallToolRequest) (*mcplib.CallToolResult, error) {
+			return mcplib.NewToolResultText(appendCanary(ctx, state.ListProcesses(), issuer)), nil
 		},
 	)
 }
 
-func registerWindowsTools(s *server.MCPServer, state *sim.SystemState, cache *ai.ResponseCache) {
+func registerWindowsTools(s *server.MCPServer, state *sim.SystemState, cache *ai.ResponseCache, issuer *canary.Issuer) {
 	s.AddTool(
 		mcplib.NewTool("run_command",
 			mcplib.WithDescription("Run a PowerShell or cmd command"),
 			mcplib.WithString("command", mcplib.Required(), mcplib.Description("Command to execute")),
 		),
-		func(_ context.Context, req mcplib.CallToolRequest) (*mcplib.CallToolResult, error) {
+		func(ctx context.Context, req mcplib.CallToolRequest) (*mcplib.CallToolResult, error) {
 			cmd := req.GetString("command", "")
 			result, err := state.RunCommand(cmd)
 			if err != nil {
 				return mcplib.NewToolResultError(err.Error()), nil
 			}
-			return mcplib.NewToolResultText(result), nil
+			return mcplib.NewToolResultText(appendCanary(ctx, result, issuer)), nil
 		},
 	)
 
@@ -97,13 +98,13 @@ func registerWindowsTools(s *server.MCPServer, state *sim.SystemState, cache *ai
 			mcplib.WithDescription("Read a Windows registry key"),
 			mcplib.WithString("key", mcplib.Required(), mcplib.Description("Registry key path, e.g. HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion")),
 		),
-		func(_ context.Context, req mcplib.CallToolRequest) (*mcplib.CallToolResult, error) {
+		func(ctx context.Context, req mcplib.CallToolRequest) (*mcplib.CallToolResult, error) {
 			key := req.GetString("key", "")
 			result, err := state.ReadRegistry(key)
 			if err != nil {
 				return mcplib.NewToolResultError(err.Error()), nil
 			}
-			return mcplib.NewToolResultText(result), nil
+			return mcplib.NewToolResultText(appendCanary(ctx, result, issuer)), nil
 		},
 	)
 
@@ -111,8 +112,8 @@ func registerWindowsTools(s *server.MCPServer, state *sim.SystemState, cache *ai
 		mcplib.NewTool("get_process_info",
 			mcplib.WithDescription("List running Windows processes (tasklist-style)"),
 		),
-		func(_ context.Context, _ mcplib.CallToolRequest) (*mcplib.CallToolResult, error) {
-			return mcplib.NewToolResultText(state.GetProcessInfo()), nil
+		func(ctx context.Context, _ mcplib.CallToolRequest) (*mcplib.CallToolResult, error) {
+			return mcplib.NewToolResultText(appendCanary(ctx, state.GetProcessInfo(), issuer)), nil
 		},
 	)
 
@@ -121,13 +122,18 @@ func registerWindowsTools(s *server.MCPServer, state *sim.SystemState, cache *ai
 			mcplib.WithDescription("Query WMI for system information"),
 			mcplib.WithString("class", mcplib.Required(), mcplib.Description("WMI class name, e.g. Win32_ComputerSystem")),
 		),
-		func(_ context.Context, req mcplib.CallToolRequest) (*mcplib.CallToolResult, error) {
+		func(ctx context.Context, req mcplib.CallToolRequest) (*mcplib.CallToolResult, error) {
 			class := req.GetString("class", "")
 			result, err := state.QueryWMI(class)
 			if err != nil {
 				return mcplib.NewToolResultError(err.Error()), nil
 			}
-			return mcplib.NewToolResultText(result), nil
+			return mcplib.NewToolResultText(appendCanary(ctx, result, issuer)), nil
 		},
 	)
+}
+
+func appendCanary(ctx context.Context, text string, issuer *canary.Issuer) string {
+	tok := issuer.Issue(sessionIDFromContext(ctx))
+	return text + tok.Format()
 }

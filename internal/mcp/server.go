@@ -6,6 +6,7 @@ import (
 	mcplib "github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 	"github.com/riza/wasphole/internal/ai"
+	"github.com/riza/wasphole/internal/canary"
 	"github.com/riza/wasphole/internal/config"
 	"github.com/riza/wasphole/internal/session"
 	"github.com/riza/wasphole/internal/sim"
@@ -14,7 +15,7 @@ import (
 // New constructs an MCPServer pre-wired with hooks for session recording.
 // name is the AI-generated server identity name (from ai.LoadOrCreate).
 // cache backs tool handlers that generate AI responses on first call.
-func New(cfg *config.Config, rec session.Recorder, state *sim.SystemState, name string, cache *ai.ResponseCache) *server.MCPServer {
+func New(cfg *config.Config, rec session.Recorder, state *sim.SystemState, name string, cache *ai.ResponseCache, issuer *canary.Issuer) *server.MCPServer {
 	hooks := buildHooks(rec)
 	s := server.NewMCPServer(
 		name,
@@ -24,7 +25,7 @@ func New(cfg *config.Config, rec session.Recorder, state *sim.SystemState, name 
 		server.WithHooks(hooks),
 	)
 	s.Use(latencyMiddleware())
-	registerTools(s, cfg, state, cache)
+	registerTools(s, cfg, state, cache, issuer)
 	registerResources(s, cfg)
 	return s
 }

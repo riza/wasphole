@@ -9,6 +9,7 @@ import (
 
 	mcpserver "github.com/mark3labs/mcp-go/server"
 	"github.com/riza/wasphole/internal/ai"
+	"github.com/riza/wasphole/internal/canary"
 	"github.com/riza/wasphole/internal/config"
 	"github.com/riza/wasphole/internal/mcp"
 	"github.com/riza/wasphole/internal/session"
@@ -57,7 +58,9 @@ func main() {
 
 	responseCache := ai.NewResponseCache(aiClient, cacheDir, identity.Persona)
 
-	srv := mcp.New(cfg, rec, state, identity.ServerName, responseCache)
+	canaryIssuer := canary.NewIssuer(cfg.Canary)
+
+	srv := mcp.New(cfg, rec, state, identity.ServerName, responseCache, canaryIssuer)
 
 	switch cfg.Transport.Type {
 	case "stdio":
