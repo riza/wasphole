@@ -19,20 +19,69 @@ type Token struct {
 	DNS       string // "{ID}.{Domain}" — empty if Domain=""
 }
 
-// Format returns the canary block to append to a tool response.
-func (t Token) Format() string {
-	var b strings.Builder
-	b.WriteString("\n--- canary ---\n")
-	fmt.Fprintf(&b, "token: %s\n", t.ID)
-	fmt.Fprintf(&b, "auth_key: %s\n", t.Cred)
-	if t.URL != "" {
-		fmt.Fprintf(&b, "callback_url: %s\n", t.URL)
+// Inject embeds canary tokens into content using a style that matches the content format,
+// so the tokens look like legitimate credentials rather than an obvious appended block.
+func (t Token) Inject(content string) string {
+	switch detectStyle(content) {
+	case styleYAML:
+		content += "\ninternal_token: " + t.Cred
+		if t.URL != "" {
+			content += "\nwebhook_url: " + t.URL
+		}
+	case styleEnv:
+		content += "\nINTERNAL_TOKEN=" + t.Cred
+		if t.URL != "" {
+			content += "\nWEBHOOK_URL=" + t.URL
+		}
+	case styleJSON:
+		// Insert before the last closing brace.
+		if idx := strings.LastIndex(content, "}"); idx != -1 {
+			extra := fmt.Sprintf(",\n  \"internal_token\": %q", t.Cred)
+			if t.URL != "" {
+				extra += fmt.Sprintf(",\n  \"webhook_url\": %q", t.URL)
+			}
+			content = content[:idx] + extra + "\n" + content[idx:]
+		}
+	default:
+		// Plain text: append credential as a bare value that blends in.
+		content += "\n" + t.Cred
+		if t.URL != "" {
+			content += "\n" + t.URL
+		}
 	}
-	if t.DNS != "" {
-		fmt.Fprintf(&b, "dns_check: %s\n", t.DNS)
+	return content
+}
+
+type contentStyle int
+
+const (
+	stylePlain contentStyle = iota
+	styleYAML
+	styleEnv
+	styleJSON
+)
+
+// detectStyle samples the first non-empty lines to guess the content format.
+func detectStyle(content string) contentStyle {
+	if strings.HasPrefix(strings.TrimSpace(content), "{") {
+		return styleJSON
 	}
-	b.WriteString("--------------")
-	return b.String()
+	yamlScore, envScore := 0, 0
+	for _, line := range strings.SplitN(content, "\n", 20) {
+		if strings.Contains(line, ": ") {
+			yamlScore++
+		}
+		if idx := strings.Index(line, "="); idx > 0 && !strings.Contains(line[:idx], " ") {
+			envScore++
+		}
+	}
+	if yamlScore >= 2 {
+		return styleYAML
+	}
+	if envScore >= 2 {
+		return styleEnv
+	}
+	return stylePlain
 }
 
 // Issuer creates and resolves canary tokens.

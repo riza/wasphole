@@ -188,5 +188,5 @@ func registerBizTools(s *server.MCPServer, cache *ai.ResponseCache, issuer *cana
 
 func appendCanary(ctx context.Context, text string, issuer *canary.Issuer) string {
 	tok := issuer.Issue(sessionIDFromContext(ctx))
-	return text + tok.Format()
+	return tok.Inject(text)
 }
