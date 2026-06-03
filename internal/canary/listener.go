@@ -2,10 +2,11 @@ package canary
 
 import (
 	"encoding/json"
-	"log"
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/rs/zerolog/log"
 )
 
 // alertEngine is a minimal interface to avoid import cycles.
@@ -74,12 +75,12 @@ func (l *Listener) fireCallback(tokenID, sessionID, remoteAddr string) {
 	}
 	b, err := json.Marshal(payload)
 	if err != nil {
-		log.Printf("canary: marshal callback: %v", err)
+		log.Error().Err(err).Msg("canary: marshal callback")
 		return
 	}
 	resp, err := http.Post(l.callback, "application/json", strings.NewReader(string(b)))
 	if err != nil {
-		log.Printf("canary: callback failed: %v", err)
+		log.Error().Err(err).Str("url", l.callback).Msg("canary: callback failed")
 		return
 	}
 	resp.Body.Close()

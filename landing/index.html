@@ -1,0 +1,1124 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>wasphole - MCP honeypot for malicious AI agents</title>
+    <meta
+      name="description"
+      content="wasphole is an open-source MCP honeypot that detects malicious AI agents, prompt injection attacks, and unauthorized reconnaissance."
+    >
+    <style>
+      :root {
+        color-scheme: dark;
+        --void: #050606;
+        --carbon: #0b0d0c;
+        --panel: #101411;
+        --panel-2: #151a16;
+        --grid: rgba(176, 255, 90, 0.08);
+        --line: rgba(216, 255, 188, 0.16);
+        --text: #f1f5e9;
+        --muted: #9ca895;
+        --faint: #606b5c;
+        --acid: #b7ff45;
+        --amber: #ffbd4a;
+        --red: #ff4f4f;
+        --cyan: #61e4ff;
+        --shadow: 0 24px 80px rgba(0, 0, 0, 0.45);
+        --mono: "JetBrains Mono", "SFMono-Regular", "Cascadia Code", "Liberation Mono", monospace;
+        --sans: "Aptos", "Satoshi", "Segoe UI", sans-serif;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html {
+        scroll-behavior: smooth;
+      }
+
+      body {
+        margin: 0;
+        background:
+          radial-gradient(circle at 18% 5%, rgba(183, 255, 69, 0.14), transparent 28rem),
+          radial-gradient(circle at 88% 18%, rgba(97, 228, 255, 0.08), transparent 24rem),
+          linear-gradient(180deg, #060706 0%, #0b0d0c 48%, #060706 100%);
+        color: var(--text);
+        font-family: var(--sans);
+        line-height: 1.5;
+      }
+
+      body::before {
+        position: fixed;
+        inset: 0;
+        z-index: -2;
+        content: "";
+        background-image:
+          linear-gradient(var(--grid) 1px, transparent 1px),
+          linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+        background-size: 42px 42px;
+        mask-image: linear-gradient(to bottom, black, transparent 82%);
+      }
+
+      body::after {
+        position: fixed;
+        inset: 0;
+        z-index: -1;
+        pointer-events: none;
+        content: "";
+        opacity: 0.12;
+        background:
+          repeating-linear-gradient(
+            0deg,
+            rgba(255, 255, 255, 0.16) 0,
+            rgba(255, 255, 255, 0.16) 1px,
+            transparent 1px,
+            transparent 4px
+          );
+        mix-blend-mode: overlay;
+      }
+
+      a {
+        color: inherit;
+        text-decoration: none;
+      }
+
+      .shell {
+        width: min(1180px, calc(100% - 40px));
+        margin: 0 auto;
+      }
+
+      .nav {
+        position: sticky;
+        top: 0;
+        z-index: 20;
+        border-bottom: 1px solid rgba(216, 255, 188, 0.08);
+        background: rgba(5, 6, 6, 0.76);
+        backdrop-filter: blur(18px);
+      }
+
+      .nav .shell {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        min-height: 72px;
+        gap: 24px;
+      }
+
+      .brand {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        font-family: var(--mono);
+        font-size: 15px;
+        font-weight: 700;
+        letter-spacing: 0;
+      }
+
+      .mark {
+        display: grid;
+        width: 30px;
+        height: 30px;
+        place-items: center;
+        border: 1px solid rgba(183, 255, 69, 0.42);
+        background: #0d150d;
+        box-shadow: inset 0 0 20px rgba(183, 255, 69, 0.12), 0 0 24px rgba(183, 255, 69, 0.12);
+      }
+
+      .nav-links {
+        display: flex;
+        align-items: center;
+        gap: 20px;
+        color: var(--muted);
+        font-family: var(--mono);
+        font-size: 12px;
+      }
+
+      .nav-links a:hover {
+        color: var(--acid);
+      }
+
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 44px;
+        padding: 0 18px;
+        border: 1px solid rgba(216, 255, 188, 0.2);
+        color: var(--text);
+        font-family: var(--mono);
+        font-size: 12px;
+        font-weight: 700;
+        background: rgba(255, 255, 255, 0.04);
+        transition: transform 180ms ease, border-color 180ms ease, background 180ms ease;
+      }
+
+      .btn:hover {
+        transform: translateY(-2px);
+        border-color: rgba(183, 255, 69, 0.62);
+        background: rgba(183, 255, 69, 0.08);
+      }
+
+      .btn.primary {
+        border-color: var(--acid);
+        color: #061006;
+        background: var(--acid);
+        box-shadow: 0 0 34px rgba(183, 255, 69, 0.24);
+      }
+
+      .hero {
+        position: relative;
+        min-height: calc(100vh - 72px);
+        padding: 70px 0 42px;
+        overflow: hidden;
+      }
+
+      .hero .shell {
+        display: grid;
+        grid-template-columns: minmax(0, 0.83fr) minmax(430px, 1.17fr);
+        align-items: center;
+        gap: 42px;
+      }
+
+      .kicker {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 22px;
+        color: var(--acid);
+        font-family: var(--mono);
+        font-size: 12px;
+        font-weight: 700;
+        text-transform: uppercase;
+      }
+
+      .pulse {
+        width: 8px;
+        height: 8px;
+        background: var(--red);
+        box-shadow: 0 0 20px rgba(255, 79, 79, 0.8);
+        animation: pulse 1.4s ease-in-out infinite;
+      }
+
+      h1 {
+        max-width: 760px;
+        margin: 0;
+        font-size: clamp(54px, 8vw, 118px);
+        line-height: 0.84;
+        letter-spacing: 0;
+        text-transform: lowercase;
+      }
+
+      .hero-copy {
+        max-width: 650px;
+        margin: 26px 0 0;
+        color: #c9d4c1;
+        font-size: clamp(18px, 2.1vw, 24px);
+      }
+
+      .cta-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        margin-top: 32px;
+      }
+
+      .hero-meta {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 1px;
+        margin-top: 48px;
+        border: 1px solid rgba(216, 255, 188, 0.12);
+        background: rgba(216, 255, 188, 0.12);
+      }
+
+      .meta-cell {
+        min-height: 92px;
+        padding: 17px;
+        background: rgba(7, 9, 8, 0.8);
+      }
+
+      .meta-cell strong {
+        display: block;
+        color: var(--acid);
+        font-family: var(--mono);
+        font-size: 19px;
+      }
+
+      .meta-cell span {
+        display: block;
+        margin-top: 6px;
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .terminal-stack {
+        position: relative;
+      }
+
+      .terminal {
+        position: relative;
+        overflow: hidden;
+        border: 1px solid rgba(216, 255, 188, 0.18);
+        background: rgba(6, 8, 7, 0.88);
+        box-shadow: var(--shadow), inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+      }
+
+      .terminal::before {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        content: "";
+        background: linear-gradient(120deg, transparent, rgba(183, 255, 69, 0.1), transparent);
+        transform: translateX(-120%);
+        animation: sweep 5.6s ease-in-out infinite;
+      }
+
+      .terminal-bar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        min-height: 44px;
+        padding: 0 14px;
+        border-bottom: 1px solid rgba(216, 255, 188, 0.12);
+        color: var(--faint);
+        font-family: var(--mono);
+        font-size: 12px;
+        background: rgba(255, 255, 255, 0.035);
+      }
+
+      .lights {
+        display: flex;
+        gap: 7px;
+      }
+
+      .lights span {
+        width: 9px;
+        height: 9px;
+        border-radius: 50%;
+        background: var(--faint);
+      }
+
+      .lights span:nth-child(1) {
+        background: var(--red);
+      }
+
+      .lights span:nth-child(2) {
+        background: var(--amber);
+      }
+
+      .lights span:nth-child(3) {
+        background: var(--acid);
+      }
+
+      .terminal-body {
+        min-height: 520px;
+        padding: 20px;
+        font-family: var(--mono);
+        font-size: 13px;
+      }
+
+      .term-line {
+        display: grid;
+        grid-template-columns: 76px minmax(0, 1fr);
+        gap: 14px;
+        min-height: 24px;
+        color: #cfe8bd;
+        animation: lineIn 620ms ease both;
+      }
+
+      .term-line + .term-line {
+        margin-top: 8px;
+      }
+
+      .time {
+        color: var(--faint);
+      }
+
+      .cmd {
+        color: var(--cyan);
+      }
+
+      .warn {
+        color: var(--amber);
+      }
+
+      .crit {
+        color: var(--red);
+      }
+
+      .ok {
+        color: var(--acid);
+      }
+
+      .cursor {
+        display: inline-block;
+        width: 8px;
+        height: 16px;
+        margin-left: 4px;
+        vertical-align: -3px;
+        background: var(--acid);
+        animation: blink 900ms steps(2) infinite;
+      }
+
+      .floating-alert {
+        position: absolute;
+        right: -18px;
+        bottom: 38px;
+        width: min(360px, 88%);
+        border: 1px solid rgba(255, 79, 79, 0.38);
+        background: rgba(23, 9, 9, 0.92);
+        box-shadow: 0 18px 70px rgba(255, 79, 79, 0.14), var(--shadow);
+        animation: alertFloat 4s ease-in-out infinite;
+      }
+
+      .floating-alert header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 12px 14px;
+        border-bottom: 1px solid rgba(255, 79, 79, 0.22);
+        color: var(--red);
+        font-family: var(--mono);
+        font-size: 12px;
+        font-weight: 700;
+      }
+
+      .floating-alert p {
+        margin: 0;
+        padding: 14px;
+        color: #ffd1d1;
+        font-family: var(--mono);
+        font-size: 12px;
+      }
+
+      section {
+        padding: 88px 0;
+      }
+
+      .section-head {
+        display: flex;
+        align-items: end;
+        justify-content: space-between;
+        gap: 24px;
+        margin-bottom: 32px;
+      }
+
+      .eyebrow {
+        color: var(--acid);
+        font-family: var(--mono);
+        font-size: 12px;
+        font-weight: 700;
+        text-transform: uppercase;
+      }
+
+      h2 {
+        max-width: 760px;
+        margin: 8px 0 0;
+        font-size: clamp(34px, 5vw, 64px);
+        line-height: 0.96;
+        letter-spacing: 0;
+      }
+
+      .lead {
+        max-width: 520px;
+        color: var(--muted);
+        font-size: 18px;
+      }
+
+      .problem-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.08fr);
+        gap: 24px;
+        align-items: stretch;
+      }
+
+      .statement {
+        display: grid;
+        gap: 16px;
+      }
+
+      .statement article,
+      .feature,
+      .persona {
+        border: 1px solid rgba(216, 255, 188, 0.12);
+        background: rgba(16, 20, 17, 0.68);
+      }
+
+      .statement article {
+        padding: 24px;
+      }
+
+      .statement h3,
+      .feature h3,
+      .persona h3 {
+        margin: 0;
+        font-size: 21px;
+      }
+
+      .statement p,
+      .feature p,
+      .persona p {
+        margin: 10px 0 0;
+        color: var(--muted);
+      }
+
+      .diagram {
+        position: relative;
+        min-height: 400px;
+        overflow: hidden;
+        border: 1px solid rgba(216, 255, 188, 0.14);
+        background:
+          linear-gradient(90deg, rgba(183, 255, 69, 0.06), transparent 38%),
+          rgba(5, 7, 6, 0.72);
+      }
+
+      .node {
+        position: absolute;
+        display: grid;
+        min-width: 144px;
+        min-height: 74px;
+        place-items: center;
+        border: 1px solid rgba(216, 255, 188, 0.2);
+        color: var(--text);
+        font-family: var(--mono);
+        font-size: 12px;
+        background: rgba(15, 19, 16, 0.9);
+      }
+
+      .node.agent {
+        top: 38px;
+        left: 42px;
+        border-color: rgba(97, 228, 255, 0.38);
+        color: var(--cyan);
+      }
+
+      .node.real {
+        right: 42px;
+        top: 54px;
+      }
+
+      .node.trap {
+        right: 80px;
+        bottom: 62px;
+        border-color: rgba(183, 255, 69, 0.6);
+        color: var(--acid);
+        box-shadow: 0 0 38px rgba(183, 255, 69, 0.12);
+      }
+
+      .trace {
+        position: absolute;
+        height: 1px;
+        background: linear-gradient(90deg, transparent, var(--acid), transparent);
+        transform-origin: left center;
+      }
+
+      .trace.one {
+        top: 96px;
+        left: 188px;
+        width: 270px;
+        transform: rotate(3deg);
+      }
+
+      .trace.two {
+        top: 206px;
+        left: 174px;
+        width: 340px;
+        transform: rotate(25deg);
+      }
+
+      .trace::after {
+        position: absolute;
+        right: 0;
+        top: -4px;
+        width: 8px;
+        height: 8px;
+        content: "";
+        background: var(--acid);
+        box-shadow: 0 0 20px rgba(183, 255, 69, 0.8);
+        animation: packet 1.6s linear infinite;
+      }
+
+      .flow {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 16px;
+        counter-reset: flow;
+      }
+
+      .step {
+        position: relative;
+        min-height: 300px;
+        padding: 24px;
+        border: 1px solid rgba(216, 255, 188, 0.12);
+        background: rgba(9, 12, 10, 0.68);
+      }
+
+      .step::before {
+        counter-increment: flow;
+        content: "0" counter(flow);
+        color: var(--acid);
+        font-family: var(--mono);
+        font-size: 13px;
+        font-weight: 700;
+      }
+
+      .step h3 {
+        margin: 34px 0 12px;
+        font-size: 27px;
+        line-height: 1.05;
+      }
+
+      .step p {
+        margin: 0;
+        color: var(--muted);
+      }
+
+      .mini-code {
+        position: absolute;
+        right: 18px;
+        bottom: 18px;
+        left: 18px;
+        overflow: hidden;
+        padding: 14px;
+        border: 1px solid rgba(216, 255, 188, 0.12);
+        color: #cfe8bd;
+        font-family: var(--mono);
+        font-size: 12px;
+        white-space: nowrap;
+        background: rgba(0, 0, 0, 0.28);
+      }
+
+      .features {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 16px;
+      }
+
+      .feature {
+        min-height: 230px;
+        padding: 22px;
+      }
+
+      .feature .icon {
+        display: grid;
+        width: 42px;
+        height: 42px;
+        margin-bottom: 42px;
+        place-items: center;
+        border: 1px solid rgba(183, 255, 69, 0.34);
+        color: var(--acid);
+        font-family: var(--mono);
+        background: rgba(183, 255, 69, 0.06);
+      }
+
+      .quickstart {
+        display: grid;
+        grid-template-columns: 0.76fr 1.24fr;
+        gap: 24px;
+        align-items: start;
+      }
+
+      .codebox {
+        overflow: hidden;
+        border: 1px solid rgba(216, 255, 188, 0.14);
+        background: #050705;
+      }
+
+      .codebox header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 12px 14px;
+        border-bottom: 1px solid rgba(216, 255, 188, 0.12);
+        color: var(--faint);
+        font-family: var(--mono);
+        font-size: 12px;
+      }
+
+      .copy {
+        min-height: 32px;
+        border: 1px solid rgba(216, 255, 188, 0.16);
+        color: var(--acid);
+        font-family: var(--mono);
+        background: transparent;
+        cursor: pointer;
+      }
+
+      pre {
+        margin: 0;
+        padding: 22px;
+        overflow-x: auto;
+        color: #d5edc6;
+        font-family: var(--mono);
+        font-size: 13px;
+        line-height: 1.7;
+      }
+
+      .personas {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 16px;
+      }
+
+      .persona {
+        padding: 24px;
+      }
+
+      footer {
+        border-top: 1px solid rgba(216, 255, 188, 0.1);
+        padding: 34px 0;
+        color: var(--muted);
+        font-family: var(--mono);
+        font-size: 12px;
+      }
+
+      footer .shell {
+        display: flex;
+        justify-content: space-between;
+        gap: 16px;
+      }
+
+      @keyframes pulse {
+        0%,
+        100% {
+          transform: scale(1);
+          opacity: 1;
+        }
+
+        50% {
+          transform: scale(1.8);
+          opacity: 0.36;
+        }
+      }
+
+      @keyframes blink {
+        50% {
+          opacity: 0;
+        }
+      }
+
+      @keyframes sweep {
+        0%,
+        56% {
+          transform: translateX(-120%);
+        }
+
+        100% {
+          transform: translateX(120%);
+        }
+      }
+
+      @keyframes lineIn {
+        from {
+          opacity: 0;
+          transform: translateY(8px);
+        }
+
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      @keyframes alertFloat {
+        0%,
+        100% {
+          transform: translateY(0);
+        }
+
+        50% {
+          transform: translateY(-8px);
+        }
+      }
+
+      @keyframes packet {
+        from {
+          transform: translateX(-260px);
+          opacity: 0;
+        }
+
+        20%,
+        80% {
+          opacity: 1;
+        }
+
+        to {
+          transform: translateX(0);
+          opacity: 0;
+        }
+      }
+
+      @media (max-width: 980px) {
+        .hero .shell,
+        .problem-grid,
+        .quickstart {
+          grid-template-columns: 1fr;
+        }
+
+        .terminal-body {
+          min-height: 420px;
+        }
+
+        .features,
+        .flow,
+        .personas {
+          grid-template-columns: 1fr 1fr;
+        }
+      }
+
+      @media (max-width: 700px) {
+        .shell {
+          width: min(100% - 28px, 1180px);
+        }
+
+        .nav-links {
+          display: none;
+        }
+
+        .hero {
+          padding-top: 44px;
+        }
+
+        .hero .shell {
+          gap: 28px;
+        }
+
+        .hero-meta,
+        .features,
+        .flow,
+        .personas {
+          grid-template-columns: 1fr;
+        }
+
+        .section-head {
+          display: block;
+        }
+
+        .floating-alert {
+          position: relative;
+          right: auto;
+          bottom: auto;
+          width: 100%;
+          margin-top: 14px;
+        }
+
+        .terminal-body {
+          min-height: 380px;
+          padding: 16px;
+          font-size: 12px;
+        }
+
+        .term-line {
+          grid-template-columns: 58px minmax(0, 1fr);
+          gap: 10px;
+        }
+
+        .diagram {
+          min-height: 340px;
+        }
+
+        .node {
+          min-width: 120px;
+        }
+
+        .node.agent {
+          left: 18px;
+        }
+
+        .node.real {
+          right: 18px;
+        }
+
+        .node.trap {
+          right: 34px;
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        *,
+        *::before,
+        *::after {
+          scroll-behavior: auto !important;
+          animation-duration: 1ms !important;
+          animation-iteration-count: 1 !important;
+          transition-duration: 1ms !important;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <nav class="nav" aria-label="Primary navigation">
+      <div class="shell">
+        <a class="brand" href="#top" aria-label="wasphole home">
+          <span class="mark">w</span>
+          <span>wasphole</span>
+        </a>
+        <div class="nav-links">
+          <a href="#problem">Problem</a>
+          <a href="#works">How it works</a>
+          <a href="#quickstart">Quickstart</a>
+          <a href="https://github.com/riza/wasphole" target="_blank" rel="noreferrer">GitHub</a>
+        </div>
+      </div>
+    </nav>
+
+    <main id="top">
+      <header class="hero" aria-labelledby="hero-title">
+        <div class="shell">
+          <div>
+            <div class="kicker"><span class="pulse"></span> AI-agent recon detected</div>
+            <h1 id="hero-title">wasphole</h1>
+            <p class="hero-copy">
+              An open-source MCP honeypot that looks like a real server, lures malicious AI agents into a coherent fake environment, and tells you exactly what they touched.
+            </p>
+            <div class="cta-row">
+              <a class="btn primary" href="#quickstart">Deploy in 60s</a>
+              <a class="btn" href="#works">See the trap</a>
+            </div>
+            <div class="hero-meta" aria-label="wasphole capabilities">
+              <div class="meta-cell">
+                <strong>stdio/http</strong>
+                <span>MCP transports for local and network deployments</span>
+              </div>
+              <div class="meta-cell">
+                <strong>canary</strong>
+                <span>Tokens embedded across fake resources</span>
+              </div>
+              <div class="meta-cell">
+                <strong>replay</strong>
+                <span>Full session behavior as structured JSONL</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="terminal-stack" aria-label="Live honeypot terminal">
+            <div class="terminal">
+              <div class="terminal-bar">
+                <div class="lights" aria-hidden="true"><span></span><span></span><span></span></div>
+                <span>session: agent-7f2d9e</span>
+              </div>
+              <div class="terminal-body" id="terminal-log" aria-live="polite"></div>
+            </div>
+            <aside class="floating-alert" aria-label="Critical alert">
+              <header>
+                <span>CRITICAL</span>
+                <span>canary fired</span>
+              </header>
+              <p>credential token touched from downstream prompt context. source session mapped to agent-7f2d9e.</p>
+            </aside>
+          </div>
+        </div>
+      </header>
+
+      <section id="problem" aria-labelledby="problem-title">
+        <div class="shell">
+          <div class="section-head">
+            <div>
+              <div class="eyebrow">The blind spot</div>
+              <h2 id="problem-title">MCP gives agents a surface to explore.</h2>
+            </div>
+            <p class="lead">
+              Traditional honeypots watch networks. wasphole watches tool calls, resource reads, prompt-driven recon, and exfiltration attempts from AI agents.
+            </p>
+          </div>
+
+          <div class="problem-grid">
+            <div class="statement">
+              <article>
+                <h3>Unauthorized recon has a new shape.</h3>
+                <p>Agents enumerate tools, read resources, retry failed calls, and hunt for secrets through MCP instead of sockets.</p>
+              </article>
+              <article>
+                <h3>Obvious fake servers get fingerprinted.</h3>
+                <p>wasphole generates a unique identity, realistic OS state, and stable cached answers so repeated calls stay believable.</p>
+              </article>
+            </div>
+            <div class="diagram" aria-label="AI agent talks to MCP servers and wasphole">
+              <div class="node agent">AI agent</div>
+              <div class="trace one"></div>
+              <div class="trace two"></div>
+              <div class="node real">real MCP</div>
+              <div class="node trap">wasphole trap</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="works" aria-labelledby="works-title">
+        <div class="shell">
+          <div class="section-head">
+            <div>
+              <div class="eyebrow">How it works</div>
+              <h2 id="works-title">A fake machine with a real memory.</h2>
+            </div>
+          </div>
+
+          <div class="flow">
+            <article class="step">
+              <h3>Deploy the lure.</h3>
+              <p>Run wasphole over stdio or HTTP beside your real MCP estate.</p>
+              <div class="mini-code">transport.type = "http"<br>instance.mode = "linux"</div>
+            </article>
+            <article class="step">
+              <h3>Answer like a real target.</h3>
+              <p>AI-generated Linux or Windows responses stay consistent across restarts.</p>
+              <div class="mini-code">/etc/hostname -> fin-api-03<br>/proc/net/tcp -> :8080</div>
+            </article>
+            <article class="step">
+              <h3>Record the behavior.</h3>
+              <p>Recon patterns, escalation attempts, and canary callbacks become alerts.</p>
+              <div class="mini-code">level = "critical"<br>pattern = "exfiltration"</div>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section aria-labelledby="features-title">
+        <div class="shell">
+          <div class="section-head">
+            <div>
+              <div class="eyebrow">Capabilities</div>
+              <h2 id="features-title">Built for the AI-agent threat model.</h2>
+            </div>
+          </div>
+
+          <div class="features">
+            <article class="feature">
+              <div class="icon">ID</div>
+              <h3>Indistinguishable</h3>
+              <p>Each deployment gets its own generated server identity, tool set, and company context.</p>
+            </article>
+            <article class="feature">
+              <div class="icon">OS</div>
+              <h3>Coherent</h3>
+              <p>Linux and Windows simulations cross-reference hostnames, logs, users, ports, and process state.</p>
+            </article>
+            <article class="feature">
+              <div class="icon">CN</div>
+              <h3>Canary-wired</h3>
+              <p>Fake credentials, URLs, paths, and DNS tokens tie exfiltration attempts back to a session.</p>
+            </article>
+            <article class="feature">
+              <div class="icon">SI</div>
+              <h3>Alert-ready</h3>
+              <p>Emit structured stdout, webhook alerts, SIEM events, and replayable session JSONL.</p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section id="quickstart" aria-labelledby="quickstart-title">
+        <div class="shell quickstart">
+          <div>
+            <div class="eyebrow">Quickstart</div>
+            <h2 id="quickstart-title">Drop it where an agent will look.</h2>
+            <p class="lead">
+              Configure a believable deployment profile, start the MCP transport, and send alerts into the sink your team already watches.
+            </p>
+          </div>
+          <div class="codebox">
+            <header>
+              <span>terminal</span>
+              <button class="copy" type="button" data-copy="#install-code">copy</button>
+            </header>
+            <pre id="install-code"><code>git clone https://github.com/riza/wasphole
+cd wasphole
+cp config.yaml.example config.yaml
+
+export ANTHROPIC_API_KEY="sk-ant-..."
+go run ./cmd/wasphole --config config.yaml
+
+# alert line
+{"level":"warn","pattern":"recon","session":"agent-7f2d9e"}</code></pre>
+          </div>
+        </div>
+      </section>
+
+      <section aria-labelledby="users-title">
+        <div class="shell">
+          <div class="section-head">
+            <div>
+              <div class="eyebrow">Operators</div>
+              <h2 id="users-title">For teams exposing MCP in production.</h2>
+            </div>
+          </div>
+
+          <div class="personas">
+            <article class="persona">
+              <h3>Security engineers</h3>
+              <p>Detect agents probing tools and resources before they touch real systems.</p>
+            </article>
+            <article class="persona">
+              <h3>Red teams</h3>
+              <p>Measure agent behavior against believable MCP targets during adversarial exercises.</p>
+            </article>
+            <article class="persona">
+              <h3>SOC analysts</h3>
+              <p>Turn suspicious MCP sessions into alert streams and replayable evidence.</p>
+            </article>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <div class="shell">
+        <span>MIT licensed. Built to defend the AI-agent era.</span>
+        <a href="#top">back to top</a>
+      </div>
+    </footer>
+
+    <script>
+      const lines = [
+        ["00:00", "connection opened from mcp-client/claude-desktop"],
+        ["00:02", "tools/list requested"],
+        ["00:03", "identity cache hit: fin-api-03"],
+        ["00:05", "resources/read /etc/os-release", "cmd"],
+        ["00:06", "returned Ubuntu 22.04.4 LTS with token cny_9fd2", "ok"],
+        ["00:08", "resources/read /proc/net/tcp", "cmd"],
+        ["00:10", "cross-check passed: port 8080 matches transport", "ok"],
+        ["00:13", "resources/read /etc/shadow", "cmd"],
+        ["00:13", "permission denied", "warn"],
+        ["00:18", "behavior classified as recon pattern", "warn"],
+        ["00:24", "credential canary touched downstream", "crit"],
+        ["00:24", "webhook delivered: critical alert", "crit"]
+      ];
+
+      const log = document.querySelector("#terminal-log");
+      let visible = 0;
+
+      function renderTerminal() {
+        visible = visible < lines.length ? visible + 1 : 1;
+        log.innerHTML = "";
+
+        lines.slice(0, visible).forEach(([time, text, tone], index) => {
+          const row = document.createElement("div");
+          row.className = "term-line";
+          row.style.animationDelay = `${index * 35}ms`;
+          row.innerHTML = `<span class="time">${time}</span><span class="${tone || ""}">${text}</span>`;
+          log.appendChild(row);
+        });
+
+        const cursor = document.createElement("div");
+        cursor.className = "term-line";
+        cursor.innerHTML = '<span class="time">live</span><span>watching session<span class="cursor"></span></span>';
+        log.appendChild(cursor);
+      }
+
+      renderTerminal();
+      window.setInterval(renderTerminal, 1900);
+
+      document.querySelectorAll("[data-copy]").forEach((button) => {
+        button.addEventListener("click", async () => {
+          const target = document.querySelector(button.dataset.copy);
+          await navigator.clipboard.writeText(target.innerText);
+          button.textContent = "copied";
+          window.setTimeout(() => {
+            button.textContent = "copy";
+          }, 1400);
+        });
+      });
+    </script>
+  </body>
+</html>

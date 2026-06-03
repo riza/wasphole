@@ -3,10 +3,11 @@ package alert
 import (
 	"context"
 	"fmt"
-	"log"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/rs/zerolog/log"
 
 	mcplib "github.com/mark3labs/mcp-go/mcp"
 	"github.com/riza/wasphole/internal/config"
@@ -57,7 +58,7 @@ func (d *Dispatcher) Emit(evt Event) {
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()
 			if err := s.Send(ctx, evt); err != nil {
-				log.Printf("alert sink error: %v", err)
+				log.Error().Err(err).Msg("alert sink error")
 			}
 		}(s)
 	}
@@ -164,7 +165,7 @@ func (e *Engine) ObserveCanaryFire(sessionID, tokenID string) {
 func (e *Engine) loadSession(sessionID string) *sessionState {
 	v, ok := e.sessions.Load(sessionID)
 	if !ok {
-		log.Printf("alert: unknown session: %s", sessionID)
+		log.Warn().Str("session_id", sessionID).Msg("alert: unknown session")
 		return nil
 	}
 	return v.(*sessionState)
