@@ -5,6 +5,7 @@ go 1.25.5
 require gopkg.in/yaml.v3 v3.0.1
 
 require (
+	github.com/brianvoe/gofakeit/v6 v6.28.0 // indirect
 	github.com/google/jsonschema-go v0.4.2 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/mark3labs/mcp-go v0.54.1 // indirect
