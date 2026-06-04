@@ -11,15 +11,64 @@ import (
 	gofakeit "github.com/brianvoe/gofakeit/v6"
 )
 
-var kernelVersions = []string{
-	"5.15.0-91-generic",
-	"5.15.0-105-generic",
-	"6.5.0-45-generic",
+type linuxDistro struct {
+	OSName      string
+	OSVersion   string
+	OSVersionID string
+	OSCodename  string
+	GCCVersion  string
+	BuildDate   string
+	Kernels     []string
+}
+
+var linuxDistros = []linuxDistro{
+	{
+		OSName: "Ubuntu", OSVersion: "22.04.3 LTS (Jammy Jellyfish)",
+		OSVersionID: "22.04", OSCodename: "Jammy Jellyfish",
+		GCCVersion: "gcc (Ubuntu 11.4.0-1ubuntu1~22.04) 11.4.0",
+		BuildDate:  "Tue Nov 14 13:30:08 UTC 2023",
+		Kernels:    []string{"5.15.0-91-generic", "5.15.0-105-generic", "5.15.0-112-generic"},
+	},
+	{
+		OSName: "Ubuntu", OSVersion: "20.04.6 LTS (Focal Fossa)",
+		OSVersionID: "20.04", OSCodename: "Focal Fossa",
+		GCCVersion: "gcc (Ubuntu 9.4.0-1ubuntu1~20.04.2) 9.4.0",
+		BuildDate:  "Mon Apr 15 10:00:00 UTC 2024",
+		Kernels:    []string{"5.4.0-182-generic", "5.4.0-186-generic", "5.4.0-189-generic"},
+	},
+	{
+		OSName: "Debian GNU/Linux", OSVersion: "12 (bookworm)",
+		OSVersionID: "12", OSCodename: "bookworm",
+		GCCVersion: "gcc (Debian 12.2.0-14) 12.2.0",
+		BuildDate:  "Sat Sep 23 00:00:00 UTC 2023",
+		Kernels:    []string{"6.1.0-21-amd64", "6.1.0-23-amd64", "6.1.0-25-amd64"},
+	},
+	{
+		OSName: "Debian GNU/Linux", OSVersion: "11 (bullseye)",
+		OSVersionID: "11", OSCodename: "bullseye",
+		GCCVersion: "gcc (Debian 10.2.1-6) 10.2.1",
+		BuildDate:  "Thu Oct  7 00:00:00 UTC 2021",
+		Kernels:    []string{"5.10.0-28-amd64", "5.10.0-30-amd64", "5.10.0-32-amd64"},
+	},
+	{
+		OSName: "Rocky Linux", OSVersion: "9.3 (Blue Onyx)",
+		OSVersionID: "9.3", OSCodename: "Blue Onyx",
+		GCCVersion: "gcc (GCC) 11.4.1 20230605 (Red Hat 11.4.1-2)",
+		BuildDate:  "Wed Nov  8 00:00:00 UTC 2023",
+		Kernels:    []string{"5.14.0-362.8.1.el9_3.x86_64", "5.14.0-427.13.1.el9_4.x86_64"},
+	},
+	{
+		OSName: "CentOS Linux", OSVersion: "7 (Core)",
+		OSVersionID: "7", OSCodename: "Core",
+		GCCVersion: "gcc (GCC) 4.8.5 20150623 (Red Hat 4.8.5-44)",
+		BuildDate:  "Mon Oct  9 00:00:00 UTC 2023",
+		Kernels:    []string{"3.10.0-1160.108.1.el7.x86_64", "3.10.0-1160.114.2.el7.x86_64"},
+	},
 }
 
 func generateLinuxState(fake *gofakeit.Faker, s *SystemState) *LinuxState {
-	kernelIdx := fake.IntRange(0, len(kernelVersions)-1)
-	kernel := kernelVersions[kernelIdx]
+	distro := linuxDistros[fake.IntRange(0, len(linuxDistros)-1)]
+	kernel := distro.Kernels[fake.IntRange(0, len(distro.Kernels)-1)]
 
 	octets := [4]int{10, fake.IntRange(1, 5), fake.IntRange(1, 3), fake.IntRange(10, 200)}
 	ip := fmt.Sprintf("%d.%d.%d.%d", octets[0], octets[1], octets[2], octets[3])
@@ -64,12 +113,12 @@ func generateLinuxState(fake *gofakeit.Faker, s *SystemState) *LinuxState {
 
 	return &LinuxState{
 		KernelVersion: kernel,
-		OSName:        "Ubuntu",
-		OSVersion:     "22.04.3 LTS (Jammy Jellyfish)",
-		OSVersionID:   "22.04",
-		OSCodename:    "Jammy Jellyfish",
-		GCCVersion:    "gcc (Ubuntu 11.4.0-1ubuntu1~22.04) 11.4.0",
-		BuildDate:     "Tue Nov 14 13:30:08 UTC 2023",
+		OSName:        distro.OSName,
+		OSVersion:     distro.OSVersion,
+		OSVersionID:   distro.OSVersionID,
+		OSCodename:    distro.OSCodename,
+		GCCVersion:    distro.GCCVersion,
+		BuildDate:     distro.BuildDate,
 		Users:         allUsers,
 		PrimaryUser:   appUser,
 		Network: LinuxNetwork{

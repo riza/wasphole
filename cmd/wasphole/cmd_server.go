@@ -142,6 +142,9 @@ func runServer() {
 
 		// ACME always listens on :443 per Let's Encrypt requirements.
 		if tlsCfg.ACMEDomain != "" {
+			if cfg.Transport.Port != 443 && cfg.Transport.Port != 0 {
+				log.Warn().Int("configured_port", cfg.Transport.Port).Msg("Let's Encrypt requires port 443 — ignoring configured port")
+			}
 			addr = ":443"
 		}
 

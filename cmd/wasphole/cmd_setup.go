@@ -92,21 +92,30 @@ func runSetup() {
 	c.Transport = pickOne(r, "Transport?", []string{"http", "stdio"})
 
 	if c.Transport == "http" {
-		raw := askFree(r, "Port?", "8080", "")
-		if p, err := strconv.Atoi(raw); err == nil && p > 0 {
-			c.Port = p
-		} else {
-			c.Port = 8080
-		}
-
 		c.TLSMode = pickOne(r, "TLS?", []string{"none", "cert + key", "Let's Encrypt"})
 		switch c.TLSMode {
 		case "cert + key":
 			c.TLSCert = askFree(r, "Cert file?", "", "e.g. /etc/wasphole/tls/cert.pem")
 			c.TLSKey  = askFree(r, "Key file?", "", "e.g. /etc/wasphole/tls/key.pem")
+			raw := askFree(r, "Port?", "443", "")
+			if p, err := strconv.Atoi(raw); err == nil && p > 0 {
+				c.Port = p
+			} else {
+				c.Port = 443
+			}
 		case "Let's Encrypt":
 			c.ACMEDomain   = askFree(r, "ACME domain?", "", "e.g. honeypot.example.com")
 			c.ACMECacheDir = askFree(r, "ACME cache dir?", "./acme-cache", "")
+			c.Port = 443
+			fmt.Println(clrFaint + "  ℹ Let's Encrypt requires port 443 — port set automatically." + clrReset)
+			fmt.Println()
+		default: // none
+			raw := askFree(r, "Port?", "8080", "")
+			if p, err := strconv.Atoi(raw); err == nil && p > 0 {
+				c.Port = p
+			} else {
+				c.Port = 8080
+			}
 		}
 	}
 
