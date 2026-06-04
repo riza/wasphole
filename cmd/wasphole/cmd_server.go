@@ -53,6 +53,10 @@ func runServer() {
 
 	cfg, err := config.Load(*configPath)
 	if err != nil {
+		if os.IsNotExist(err) {
+			fmt.Fprintf(os.Stderr, "config file not found: %s\n\nRun 'wasphole setup' to create one.\n", *configPath)
+			os.Exit(1)
+		}
 		log.Fatal().Err(err).Msg("config load failed")
 	}
 	log.Info().Str("path", *configPath).Str("mode", cfg.Instance.Mode).Str("transport", cfg.Transport.Type).Msg("config loaded")

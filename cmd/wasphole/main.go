@@ -71,6 +71,11 @@ func main() {
 		return
 	}
 
+	if sub == "setup" {
+		runSetup()
+		return
+	}
+
 	fmt.Fprint(os.Stderr, banner)
 	printBuildInfo(os.Stderr)
 
@@ -93,5 +98,5 @@ func printBuildInfo(out *os.File) {
 }
 
 func printUsage(out *os.File) {
-	fmt.Fprintln(out, "Usage:\n  wasphole server    [-config file]         run the honeypot server\n  wasphole sessions  [-dir ./sessions]       list recorded sessions\n  wasphole replay    <id> [-dir ./sessions]  show session timeline\n  wasphole version                         show build metadata")
+	fmt.Fprintln(out, "Usage:\n  wasphole setup                           interactive setup wizard\n  wasphole server    [-config file]         run the honeypot server\n  wasphole sessions  [-dir ./sessions]       list recorded sessions\n  wasphole replay    <id> [-dir ./sessions]  show session timeline\n  wasphole version                         show build metadata")
 }
