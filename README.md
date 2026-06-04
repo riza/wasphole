@@ -56,10 +56,6 @@ make build
 | [Deployment](docs/deployment.md) | Docker, production checklist, reverse proxy setup |
 | [Development](docs/development.md) | Build, test, project layout, extending wasphole |
 
-## Project status
-
-wasphole is experimental security tooling. APIs, generated surfaces, and detection rules may change quickly while MCP security patterns evolve.
-
 ## Links
 
 - X: [@rizasabuncu](https://x.com/rizasabuncu)
