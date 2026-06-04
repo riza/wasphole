@@ -240,16 +240,15 @@ func TestRunSetup_WritesConfigFile(t *testing.T) {
 	r, w, _ := os.Pipe()
 	os.Stdin = r
 
-	// Answers for all wizard questions in order:
-	// OS=1(linux), industry=fintech, seed=blank, provider=1(anthropic),
-	// baseURL=blank, apiKey=blank, model=blank(default), cacheDir=blank(default),
-	// transport=1(http), port=blank(8080), tls=1(none),
+	// Answers in wizard order:
+	// OS=1(linux), industry=fintech, seed=blank,
+	// provider=1(anthropic), baseURL=blank, apiKey=blank, model=blank, cacheDir=blank,
+	// transport=1(http), tls=1(none), port=blank(8080),
 	// webhook=blank, siem=1(none),
 	// canaryDomain=blank, canaryCallback=blank, canaryAddr=blank,
-	// proxyAddr=blank,
-	// sessionLogDir=blank(default)
+	// proxyAddr=blank, sessionLogDir=blank
 	go func() {
-		w.WriteString("1\nfintech\n\n1\n\n\n\n\n1\n\n1\n\n1\n\n\n\n\n\n")
+		w.WriteString("1\nfintech\n\n1\n\n\n\n\n1\n1\n\n\n1\n\n\n\n\n\n")
 		w.Close()
 	}()
 
