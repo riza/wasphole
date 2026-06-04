@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"runtime/debug"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -23,6 +24,32 @@ var (
 	tag       = "none"
 	buildDate = "unknown"
 )
+
+func init() {
+	// When installed via `go install`, ldflags are not set.
+	// Fall back to the module version embedded by the Go toolchain.
+	if version != "dev" {
+		return
+	}
+	info, ok := debug.ReadBuildInfo()
+	if !ok {
+		return
+	}
+	if v := info.Main.Version; v != "" && v != "(devel)" {
+		version = v
+		tag = v
+	}
+	for _, s := range info.Settings {
+		switch s.Key {
+		case "vcs.revision":
+			if len(s.Value) >= 7 {
+				commit = s.Value[:7]
+			}
+		case "vcs.time":
+			buildDate = s.Value
+		}
+	}
+}
 
 func main() {
 	log.Logger = zerolog.New(
