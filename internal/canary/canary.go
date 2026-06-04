@@ -97,11 +97,12 @@ type Issuer struct {
 	cfg    config.CanaryConfig
 	mu     sync.RWMutex
 	tokens map[string]string // tokenID → sessionID
+	creds  map[string]string // tokenID → cred (for prompt scanning)
 }
 
 // NewIssuer constructs an Issuer from the canary config.
 func NewIssuer(cfg config.CanaryConfig) *Issuer {
-	return &Issuer{cfg: cfg, tokens: make(map[string]string)}
+	return &Issuer{cfg: cfg, tokens: make(map[string]string), creds: make(map[string]string)}
 }
 
 // Issue generates a new Token for the given session and records it for lookup.
@@ -121,6 +122,7 @@ func (i *Issuer) Issue(sessionID string) Token {
 
 	i.mu.Lock()
 	i.tokens[id] = sessionID
+	i.creds[id] = cred
 	i.mu.Unlock()
 
 	return tok
@@ -132,6 +134,19 @@ func (i *Issuer) Lookup(id string) (string, bool) {
 	defer i.mu.RUnlock()
 	sess, ok := i.tokens[id]
 	return sess, ok
+}
+
+// Scan searches text for any known canary credential string.
+// Returns the sessionID and tokenID of the first match found.
+func (i *Issuer) Scan(text string) (sessionID, tokenID string, ok bool) {
+	i.mu.RLock()
+	defer i.mu.RUnlock()
+	for id, cred := range i.creds {
+		if strings.Contains(text, cred) {
+			return i.tokens[id], id, true
+		}
+	}
+	return "", "", false
 }
 
 // isPlaceholderDomain returns true for domains that are clearly not real.

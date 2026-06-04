@@ -8,6 +8,7 @@ type Config struct {
 	Alerts    AlertsConfig    `yaml:"alerts"`
 	Canary    CanaryConfig    `yaml:"canary"`
 	Session   SessionConfig   `yaml:"session"`
+	Proxy     ProxyConfig     `yaml:"proxy"`
 }
 
 // InstanceConfig controls the simulated environment (CFG-01).
@@ -38,8 +39,19 @@ type AIConfig struct {
 
 // TransportConfig controls how the MCP server listens (CFG-03).
 type TransportConfig struct {
-	Type string `yaml:"type"` // "stdio" or "http" — required
-	Port int    `yaml:"port"` // TCP port when type=http; defaults to 8080
+	Type string    `yaml:"type"` // "stdio" or "http" — required
+	Port int       `yaml:"port"` // TCP port when type=http; defaults to 8080
+	TLS  TLSConfig `yaml:"tls"`
+}
+
+// TLSConfig enables HTTPS for the HTTP transport.
+// Set either (CertFile + KeyFile) for a custom cert, or ACMEDomain for
+// automatic Let's Encrypt certificate provisioning.
+type TLSConfig struct {
+	CertFile     string `yaml:"cert_file"`     // path to PEM certificate file
+	KeyFile      string `yaml:"key_file"`      // path to PEM private key file
+	ACMEDomain   string `yaml:"acme_domain"`   // domain for automatic Let's Encrypt cert
+	ACMECacheDir string `yaml:"acme_cache_dir"` // directory to store ACME certs; defaults to ./acme-cache
 }
 
 // AlertsConfig holds one or more alert sinks (CFG-04).
@@ -67,4 +79,10 @@ type CanaryConfig struct {
 // SessionConfig controls session recording (SR-01, SR-06).
 type SessionConfig struct {
 	LogDir string `yaml:"log_dir"` // directory for JSONL session logs; defaults to "./sessions"
+}
+
+// ProxyConfig enables the OpenAI-compatible canary-scanning proxy.
+type ProxyConfig struct {
+	ListenAddr  string `yaml:"listen_addr"`  // e.g. ":8081"; empty disables the proxy
+	UpstreamURL string `yaml:"upstream_url"` // LLM API to forward to, e.g. "https://api.openai.com"
 }

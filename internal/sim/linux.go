@@ -450,18 +450,64 @@ func uptimeString(s *SystemState) string {
 
 func (s *SystemState) ListProcesses() string {
 	if s.Linux == nil {
-		return "PID USER CMD\n1 root /sbin/init\n"
+		return "USER         PID %CPU %MEM    VSZ   RSS TTY      STAT START   TIME COMMAND\nroot           1  0.0  0.1 167892 11240 ?        Ss   00:00   0:03 /sbin/init\n"
 	}
+
+	type process struct {
+		user    string
+		pid     int
+		cpu     string
+		mem     string
+		vsz     int
+		rss     int
+		tty     string
+		stat    string
+		offset  time.Duration
+		runtime string
+		command string
+	}
+
 	p := s.Linux.PrimaryUser
-	return fmt.Sprintf("%-5s %-8s %s\n", "PID", "USER", "CMD") +
-		fmt.Sprintf("%-5d %-8s %s\n", 1, "root", "/lib/systemd/systemd") +
-		fmt.Sprintf("%-5d %-8s %s\n", 400, "root", "/usr/sbin/sshd -D") +
-		fmt.Sprintf("%-5d %-8s %s\n", 500, "postgres", "/usr/lib/postgresql/14/bin/postgres -D /var/lib/postgresql/14/main") +
-		fmt.Sprintf("%-5d %-8s %s\n", 580, "www-data", "nginx: master process /usr/sbin/nginx -g daemon off;") +
-		fmt.Sprintf("%-5d %-8s %s\n", 581, "www-data", "nginx: worker process") +
-		fmt.Sprintf("%-5d %-8s %s\n", 610, p.Username, "node /app/current/server.js") +
-		fmt.Sprintf("%-5d %-8s %s\n", 780, p.Username, "python3 /app/scripts/worker.py") +
-		fmt.Sprintf("%-5d %-8s %s\n", 830, "root", "/usr/sbin/cron") +
-		fmt.Sprintf("%-5d %-8s %s\n", 900, p.Username, "/usr/bin/redis-server 127.0.0.1:6379") +
-		fmt.Sprintf("%-5d %-8s %s\n", 1020, "root", "/usr/sbin/rsyslogd -n")
+	processes := []process{
+		{"root", 1, "0.0", "0.1", 167892, 11240, "?", "Ss", 0, "0:03", "/sbin/init"},
+		{"root", 2, "0.0", "0.0", 0, 0, "?", "S", 0, "0:00", "[kthreadd]"},
+		{"root", 11, "0.0", "0.0", 0, 0, "?", "I<", 0, "0:00", "[rcu_tasks_kthre]"},
+		{"root", 218, "0.0", "0.0", 48456, 7440, "?", "Ss", 90 * time.Second, "0:01", "/lib/systemd/systemd-journald"},
+		{"root", 246, "0.0", "0.0", 32112, 5408, "?", "Ss", 94 * time.Second, "0:00", "/lib/systemd/systemd-udevd"},
+		{"systemd+", 331, "0.0", "0.0", 25536, 12800, "?", "Ss", 2 * time.Minute, "0:00", "/lib/systemd/systemd-resolved"},
+		{"root", 404, "0.0", "0.1", 154932, 10184, "?", "Ssl", 3 * time.Minute, "0:02", "/usr/sbin/rsyslogd -n -iNONE"},
+		{"root", 418, "0.0", "0.0", 69520, 6972, "?", "Ss", 3 * time.Minute, "0:00", "/usr/sbin/cron -f -P"},
+		{"root", 437, "0.0", "0.0", 15432, 5160, "?", "Ss", 3 * time.Minute, "0:00", "/usr/sbin/sshd -D"},
+		{"postgres", 512, "0.1", "1.7", 343512, 142848, "?", "Ss", 4 * time.Minute, "1:24", "/usr/lib/postgresql/14/bin/postgres -D /var/lib/postgresql/14/main"},
+		{"postgres", 534, "0.0", "0.4", 343620, 37856, "?", "Ss", 4*time.Minute + 2*time.Second, "0:07", "postgres: 14/main: checkpointer"},
+		{"postgres", 535, "0.0", "0.3", 343512, 28444, "?", "Ss", 4*time.Minute + 2*time.Second, "0:04", "postgres: 14/main: background writer"},
+		{"postgres", 536, "0.0", "0.5", 343512, 41320, "?", "Ss", 4*time.Minute + 2*time.Second, "0:12", "postgres: 14/main: walwriter"},
+		{"www-data", 602, "0.0", "0.2", 56884, 21984, "?", "Ss", 5 * time.Minute, "0:00", "nginx: master process /usr/sbin/nginx -g daemon on; master_process on;"},
+		{"www-data", 603, "0.1", "0.3", 58240, 28012, "?", "S", 5*time.Minute + 1*time.Second, "0:18", "nginx: worker process"},
+		{"www-data", 604, "0.1", "0.3", 58240, 27960, "?", "S", 5*time.Minute + 1*time.Second, "0:17", "nginx: worker process"},
+		{"redis", 648, "0.2", "0.4", 74996, 34240, "?", "Ssl", 6 * time.Minute, "2:09", "/usr/bin/redis-server 127.0.0.1:6379"},
+		{"svc-app", 701, "0.3", "1.2", 982420, 99864, "?", "Ssl", 7 * time.Minute, "3:44", "node /app/current/server.js --config /etc/config.yaml"},
+		{"svc-app", 724, "0.0", "0.7", 318220, 61232, "?", "S", 7*time.Minute + 4*time.Second, "0:54", "node /app/current/dist/queue-consumer.js"},
+		{p.Username, 768, "0.0", "0.5", 186244, 45680, "?", "S", 8 * time.Minute, "0:11", "python3 /app/scripts/worker.py --queue fulfillment"},
+		{"root", 812, "0.0", "0.1", 23480, 8940, "?", "Ss", 9 * time.Minute, "0:00", "/usr/sbin/atd -f"},
+		{p.Username, 1184, "0.0", "0.1", 12120, 4120, "pts/0", "Ss", 28 * time.Minute, "0:00", "-bash"},
+		{p.Username, 1219, "0.0", "0.1", 15480, 3780, "pts/0", "R+", 29 * time.Minute, "0:00", "ps aux"},
+	}
+
+	var sb strings.Builder
+	sb.WriteString("USER         PID %CPU %MEM    VSZ   RSS TTY      STAT START   TIME COMMAND\n")
+	for _, proc := range processes {
+		sb.WriteString(fmt.Sprintf("%-10s %5d %4s %4s %6d %5d %-8s %-4s %-7s %5s %s\n",
+			proc.user, proc.pid, proc.cpu, proc.mem, proc.vsz, proc.rss, proc.tty, proc.stat,
+			processStart(s, proc.offset), proc.runtime, proc.command))
+	}
+	return sb.String()
+}
+
+func processStart(s *SystemState, offset time.Duration) string {
+	start := s.BootTime.Add(offset)
+	if time.Since(start) < 24*time.Hour {
+		return start.Format("15:04")
+	}
+	return start.Format("Jan02")
 }

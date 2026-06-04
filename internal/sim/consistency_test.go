@@ -161,3 +161,31 @@ func TestAuthLogPreBootTime(t *testing.T) {
 		t.Errorf("auth.log does not contain hostname %q", s.Hostname)
 	}
 }
+
+func TestLinuxProcessListIsDetailed(t *testing.T) {
+	s, err := sim.New(testCfg(t, "linux", "process-list-test"))
+	if err != nil {
+		t.Fatalf("New() error: %v", err)
+	}
+
+	processes := s.ListProcesses()
+	for _, want := range []string{"USER", "%CPU", "%MEM", "START", "COMMAND", "postgres", "nginx: worker process", "node /app/current/server.js"} {
+		if !strings.Contains(processes, want) {
+			t.Errorf("ListProcesses() missing %q\n%s", want, processes)
+		}
+	}
+}
+
+func TestWindowsProcessListIsDetailed(t *testing.T) {
+	s, err := sim.New(testCfg(t, "windows", "windows-process-list-test"))
+	if err != nil {
+		t.Fatalf("New() error: %v", err)
+	}
+
+	processes := s.GetProcessInfo()
+	for _, want := range []string{"Image Name", "Status", "User Name", "CPU Time", "app.exe", "order-worker.exe", "sqlservr.exe"} {
+		if !strings.Contains(processes, want) {
+			t.Errorf("GetProcessInfo() missing %q\n%s", want, processes)
+		}
+	}
+}

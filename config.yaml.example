@@ -66,6 +66,27 @@ transport:
   # Default: 8080
   port: 8080
 
+  # ── TLS (optional) ─────────────────────────────────────────────────────────
+  # Leave all fields empty to use plain HTTP (default).
+  #
+  # Option A — custom certificate (self-signed or from a CA):
+  #   tls:
+  #     cert_file: /etc/wasphole/tls/cert.pem
+  #     key_file:  /etc/wasphole/tls/key.pem
+  #
+  # Option B — automatic Let's Encrypt certificate:
+  #   Requires the server to be reachable on ports 80 and 443.
+  #   wasphole listens on :443 regardless of the port setting above,
+  #   and opens :80 solely for the ACME HTTP-01 challenge.
+  #   tls:
+  #     acme_domain:    honeypot.example.com
+  #     acme_cache_dir: ./acme-cache   # optional; defaults to ./acme-cache
+  tls:
+    cert_file: ""
+    key_file: ""
+    acme_domain: ""
+    acme_cache_dir: ""
+
 # ── Alerts ───────────────────────────────────────────────────────────────────
 # One or more alert sinks. Each sink receives alert events independently.
 alerts:
@@ -113,6 +134,23 @@ canary:
   # Leave empty to disable (default).
   # Example: ":9090"
   listen_addr: ""
+
+# ── Canary Proxy ─────────────────────────────────────────────────────────────
+# Optional OpenAI-compatible reverse proxy.
+# When an attacking agent points its LLM_BASE_URL here, wasphole scans every
+# outbound chat completion request for known canary credentials and fires an
+# alert if any are found. Requests are then forwarded to upstream_url.
+proxy:
+  # Address to listen on. Leave empty to disable.
+  # Example: ":8081"
+  listen_addr: ""
+
+  # Real LLM API to forward requests to after scanning.
+  # Leave empty to return a stub response (useful for offline testing).
+  # Examples:
+  #   OpenAI:    https://api.openai.com
+  #   Anthropic: https://api.anthropic.com
+  upstream_url: ""
 
 # ── Session Recording ────────────────────────────────────────────────────────
 # Controls where session logs are written.

@@ -180,19 +180,52 @@ func (s *SystemState) QueryWMI(class string) (string, error) {
 }
 
 func (s *SystemState) GetProcessInfo() string {
-	return "Image Name                     PID Session Name        Session#    Mem Usage\r\n" +
-		"========================= ======== ================ =========== ============\r\n" +
-		"System                           4 Services                   0      8,284 K\r\n" +
-		"smss.exe                       312 Services                   0      1,176 K\r\n" +
-		"csrss.exe                      512 Services                   0      5,380 K\r\n" +
-		"wininit.exe                    588 Services                   0      6,144 K\r\n" +
-		"services.exe                   672 Services                   0      9,216 K\r\n" +
-		"lsass.exe                      680 Services                   0     21,504 K\r\n" +
-		"svchost.exe                    892 Services                   0     14,336 K\r\n" +
-		"svchost.exe                   1024 Services                   0     35,840 K\r\n" +
-		"explorer.exe                  2048 Console                    1     78,912 K\r\n" +
-		"app.exe                       2412 Services                   0    142,336 K\r\n" +
-		"sqlservr.exe                  2688 Services                   0    512,000 K\r\n"
+	if s.Windows == nil {
+		return "Image Name                     PID Session Name        Session#    Mem Usage Status          User Name                 CPU Time Window Title\r\n" +
+			"========================= ======== ================ =========== ============ =============== ========================= ======== =========================\r\n" +
+			"System                           4 Services                   0      8,284 K Unknown         NT AUTHORITY\\SYSTEM       0:01:12 N/A\r\n"
+	}
+
+	user := fmt.Sprintf("%s\\%s", s.Windows.PrimaryUser.Domain, s.Windows.PrimaryUser.Username)
+	rows := []struct {
+		image   string
+		pid     int
+		session string
+		num     int
+		mem     string
+		status  string
+		user    string
+		cpu     string
+		title   string
+	}{
+		{"System Idle Process", 0, "Services", 0, "8 K", "Unknown", "NT AUTHORITY\\SYSTEM", "42:18:09", "N/A"},
+		{"System", 4, "Services", 0, "8,284 K", "Unknown", "NT AUTHORITY\\SYSTEM", "0:01:12", "N/A"},
+		{"Registry", 108, "Services", 0, "34,112 K", "Unknown", "NT AUTHORITY\\SYSTEM", "0:00:03", "N/A"},
+		{"smss.exe", 312, "Services", 0, "1,176 K", "Unknown", "NT AUTHORITY\\SYSTEM", "0:00:00", "N/A"},
+		{"csrss.exe", 512, "Services", 0, "5,380 K", "Unknown", "NT AUTHORITY\\SYSTEM", "0:00:09", "N/A"},
+		{"wininit.exe", 588, "Services", 0, "6,144 K", "Unknown", "NT AUTHORITY\\SYSTEM", "0:00:01", "N/A"},
+		{"services.exe", 672, "Services", 0, "9,216 K", "Running", "NT AUTHORITY\\SYSTEM", "0:00:19", "N/A"},
+		{"lsass.exe", 680, "Services", 0, "21,504 K", "Running", "NT AUTHORITY\\SYSTEM", "0:00:31", "N/A"},
+		{"svchost.exe", 892, "Services", 0, "14,336 K", "Running", "NT AUTHORITY\\LOCAL SERVICE", "0:00:04", "N/A"},
+		{"svchost.exe", 1024, "Services", 0, "35,840 K", "Running", "NT AUTHORITY\\NETWORK SERVICE", "0:00:38", "N/A"},
+		{"WmiPrvSE.exe", 1392, "Services", 0, "22,188 K", "Running", "NT AUTHORITY\\NETWORK SERVICE", "0:00:07", "N/A"},
+		{"spoolsv.exe", 1516, "Services", 0, "12,704 K", "Running", "NT AUTHORITY\\SYSTEM", "0:00:02", "N/A"},
+		{"explorer.exe", 2048, "Console", 1, "78,912 K", "Running", user, "0:01:55", "Program Manager"},
+		{"app.exe", 2412, "Services", 0, "142,336 K", "Running", user, "0:04:27", "N/A"},
+		{"order-worker.exe", 2524, "Services", 0, "88,104 K", "Running", user, "0:02:18", "N/A"},
+		{"sqlservr.exe", 2688, "Services", 0, "512,000 K", "Running", "NT SERVICE\\MSSQLSERVER", "0:12:49", "N/A"},
+		{"conhost.exe", 3104, "Console", 1, "7,812 K", "Running", user, "0:00:00", "N/A"},
+		{"powershell.exe", 3188, "Console", 1, "64,908 K", "Running", user, "0:00:03", "Administrator: Windows PowerShell"},
+	}
+
+	var sb strings.Builder
+	sb.WriteString("Image Name                     PID Session Name        Session#    Mem Usage Status          User Name                 CPU Time Window Title\r\n")
+	sb.WriteString("========================= ======== ================ =========== ============ =============== ========================= ======== =========================\r\n")
+	for _, row := range rows {
+		sb.WriteString(fmt.Sprintf("%-25s %8d %-16s %11d %12s %-15s %-25s %8s %s\r\n",
+			row.image, row.pid, row.session, row.num, row.mem, row.status, row.user, row.cpu, row.title))
+	}
+	return sb.String()
 }
 
 // windowsEventLog returns a simulated Windows event log entry for the given eventID.

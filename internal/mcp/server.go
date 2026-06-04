@@ -5,6 +5,8 @@ import (
 
 	mcplib "github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
+	"github.com/rs/zerolog/log"
+
 	"github.com/riza/wasphole/internal/ai"
 	"github.com/riza/wasphole/internal/alert"
 	"github.com/riza/wasphole/internal/canary"
@@ -12,6 +14,21 @@ import (
 	"github.com/riza/wasphole/internal/session"
 	"github.com/riza/wasphole/internal/sim"
 )
+
+type contextKey int
+
+const remoteAddrKey contextKey = iota
+
+// WithClientIP injects the client IP into the context. Called by the HTTP
+// transport middleware so that session hooks can log the connecting address.
+func WithClientIP(ctx context.Context, ip string) context.Context {
+	return context.WithValue(ctx, remoteAddrKey, ip)
+}
+
+func clientIPFromContext(ctx context.Context) string {
+	v, _ := ctx.Value(remoteAddrKey).(string)
+	return v
+}
 
 // New constructs an MCPServer pre-wired with hooks for session recording and alerting.
 // name is the AI-generated server identity name (from ai.LoadOrCreate).
@@ -52,6 +69,11 @@ func buildHooks(rec session.Recorder, engine *alert.Engine) *server.Hooks {
 		sid := sess.SessionID()
 		engine.InitSession(sid)
 		engine.EmitConnection(sid)
+		entry := log.Info().Str("session_id", sid)
+		if ip := clientIPFromContext(ctx); ip != "" {
+			entry = entry.Str("remote_addr", ip)
+		}
+		entry.Msg("mcp: session connected")
 	})
 	h.AddOnUnregisterSession(func(ctx context.Context, sess server.ClientSession) {
 		engine.FinalizeSession(sess.SessionID())
