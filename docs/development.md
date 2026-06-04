@@ -25,10 +25,8 @@ The binary embeds version metadata from git tags:
 ## Running locally
 
 ```bash
-cp config.yaml.example config.yaml
-# edit config.yaml as needed
-
 export ANTHROPIC_API_KEY="sk-ant-..."
+./wasphole setup        # interactive wizard — writes config.yaml
 ./wasphole server -config config.yaml
 ```
 

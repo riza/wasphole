@@ -40,8 +40,8 @@ The MCP server starts on port `8080`. Point your agent or MCP client at `http://
 **From source:**
 
 ```bash
-cp config.yaml.example config.yaml
 make build
+./wasphole setup
 ./wasphole server -config config.yaml
 ```
 

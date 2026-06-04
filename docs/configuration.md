@@ -1,6 +1,12 @@
 # Configuration reference
 
-wasphole is configured via a single YAML file. Copy `config.yaml.example` to `config.yaml` and fill in the required fields.
+wasphole is configured via a single YAML file. The quickest way to create one is the interactive setup wizard:
+
+```bash
+wasphole setup
+```
+
+This asks for your OS mode, AI provider, model, transport, and optional webhook — then writes `config.yaml`. Alternatively, copy the example and edit manually:
 
 ```bash
 cp config.yaml.example config.yaml
