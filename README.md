@@ -28,22 +28,12 @@ wasphole impersonates a believable MCP server so you can observe how AI agents b
 ## Quickstart
 
 ```bash
-git clone https://github.com/riza/wasphole
-cd wasphole
-
-export ANTHROPIC_API_KEY="sk-ant-..."
-docker compose up --build
+go install github.com/riza/wasphole/cmd/wasphole@latest
+wasphole setup
+wasphole server
 ```
 
 The MCP server starts on port `8080`. Point your agent or MCP client at `http://localhost:8080`.
-
-**From source:**
-
-```bash
-make build
-./wasphole setup
-./wasphole server -config config.yaml
-```
 
 ## Documentation
 
@@ -53,7 +43,7 @@ make build
 | [Transports](docs/transports.md) | stdio, HTTP, TLS with custom cert or Let's Encrypt |
 | [Detection](docs/detection.md) | Alert patterns, levels, and sink configuration |
 | [Canary tokens](docs/canary-tokens.md) | How canaries are planted, attributed, and delivered |
-| [Deployment](docs/deployment.md) | Docker, production checklist, reverse proxy setup |
+| [Deployment](docs/deployment.md) | Production checklist, TLS, reverse proxy setup |
 | [Development](docs/development.md) | Build, test, project layout, extending wasphole |
 
 ## Links

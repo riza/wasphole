@@ -2,35 +2,6 @@
 
 ---
 
-## Docker Compose (recommended)
-
-The fastest way to get wasphole running:
-
-```bash
-git clone https://github.com/riza/wasphole
-cd wasphole
-
-export ANTHROPIC_API_KEY="sk-ant-..."
-docker compose up --build
-```
-
-The default compose stack:
-- MCP server on port `8080` (streamable HTTP)
-- Cache stored at `/data/cache` inside the container
-- Session logs stored at `/data/sessions` inside the container
-
-Edit [`docker/config.yaml`](../docker/config.yaml) to customize the configuration, or mount your own:
-
-```bash
-docker run --rm -p 8080:8080 \
-  -e ANTHROPIC_API_KEY="$ANTHROPIC_API_KEY" \
-  -v "$PWD/my-config.yaml:/etc/wasphole/config.yaml:ro" \
-  -v "$PWD/sessions:/data/sessions" \
-  wasphole:local
-```
-
----
-
 ## Production checklist
 
 **Network isolation**
@@ -59,12 +30,11 @@ docker run --rm -p 8080:8080 \
 
 - Session JSONL files contain the full content of every MCP request and response, including any canary credentials that were returned.
 - Treat session logs as sensitive. Apply appropriate file permissions and rotate or archive them regularly.
-- Mount the session log directory as a volume in Docker to persist logs across container restarts.
 
 **Let's Encrypt**
 
 - Ensure ports 80 and 443 are open before starting. Let's Encrypt's HTTP-01 challenge requires inbound access on port 80.
-- The `acme_cache_dir` must be persistent across restarts (mount as a volume in Docker).
+- The `acme_cache_dir` must be persistent across restarts.
 - Let's Encrypt enforces [rate limits](https://letsencrypt.org/docs/rate-limits/). Use a stable domain and avoid repeatedly deleting the cache directory.
 
 ---

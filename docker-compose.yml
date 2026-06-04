@@ -14,7 +14,7 @@ services:
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
     volumes:
-      - ./docker/config.yaml:/etc/wasphole/config.yaml:ro
+      - ./config.yaml:/etc/wasphole/config.yaml:ro
       - wasphole-cache:/data/cache
       - wasphole-sessions:/data/sessions
 

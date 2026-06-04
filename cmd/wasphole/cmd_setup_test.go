@@ -7,10 +7,27 @@ import (
 	"testing"
 )
 
+// helper: minimal valid setupConfig
+func baseConfig() setupConfig {
+	return setupConfig{
+		Mode:          "linux",
+		Provider:      "anthropic",
+		Model:         "claude-sonnet-4-6",
+		CacheDir:      "./cache",
+		Transport:     "http",
+		Port:          8080,
+		TLSMode:       "none",
+		SIEMFormat:    "none",
+		SessionLogDir: "./sessions",
+	}
+}
+
 // ── buildConfig ───────────────────────────────────────────────────────────────
 
 func TestBuildConfig_ContainsRequiredFields(t *testing.T) {
-	out := buildConfig("linux", "fintech", "anthropic", "", "", "claude-sonnet-4-6", "http", 8080, "")
+	c := baseConfig()
+	c.Industry = "fintech"
+	out := buildConfig(c)
 
 	for _, want := range []string{
 		"mode: linux",
@@ -29,53 +46,135 @@ func TestBuildConfig_ContainsRequiredFields(t *testing.T) {
 }
 
 func TestBuildConfig_OmitsIndustryWhenBlank(t *testing.T) {
-	out := buildConfig("linux", "", "anthropic", "", "", "claude-sonnet-4-6", "http", 8080, "")
+	out := buildConfig(baseConfig())
 	if strings.Contains(out, "industry:") {
 		t.Error("expected industry to be omitted when blank")
 	}
 }
 
 func TestBuildConfig_OmitsPortForStdio(t *testing.T) {
-	out := buildConfig("linux", "", "anthropic", "", "", "claude-sonnet-4-6", "stdio", 0, "")
-	if strings.Contains(out, "  port:") {
+	c := baseConfig()
+	c.Transport = "stdio"
+	c.Port = 0
+	if strings.Contains(buildConfig(c), "  port:") {
 		t.Error("expected port to be omitted for stdio transport")
 	}
 }
 
-func TestBuildConfig_IncludesWebhookWhenSet(t *testing.T) {
-	out := buildConfig("windows", "", "openai", "", "", "gpt-4o", "http", 8080, "https://hooks.slack.com/xyz")
+func TestBuildConfig_WebhookIncluded(t *testing.T) {
+	c := baseConfig()
+	c.WebhookURL    = "https://hooks.slack.com/xyz"
+	c.WebhookSecret = "base64secret"
+	out := buildConfig(c)
 	if !strings.Contains(out, "url: https://hooks.slack.com/xyz") {
-		t.Error("expected webhook URL in config")
+		t.Error("expected webhook URL")
 	}
-	if !strings.Contains(out, "type: webhook") {
-		t.Error("expected webhook sink type in config")
+	if !strings.Contains(out, "webhook_secret") {
+		t.Error("expected webhook_secret")
 	}
 }
 
-func TestBuildConfig_OmitsWebhookWhenBlank(t *testing.T) {
-	out := buildConfig("linux", "", "anthropic", "", "", "claude-sonnet-4-6", "http", 8080, "")
-	if strings.Contains(out, "type: webhook") {
-		t.Error("expected webhook sink to be omitted when URL is blank")
+func TestBuildConfig_WebhookOmittedWhenBlank(t *testing.T) {
+	if strings.Contains(buildConfig(baseConfig()), "type: webhook") {
+		t.Error("expected webhook sink omitted when URL blank")
+	}
+}
+
+func TestBuildConfig_SIEMIncluded(t *testing.T) {
+	c := baseConfig()
+	c.SIEMFormat = "cef"
+	c.SIEMPath   = "/var/log/wasphole/siem.log"
+	out := buildConfig(c)
+	if !strings.Contains(out, "format: cef") {
+		t.Error("expected SIEM format")
+	}
+	if !strings.Contains(out, `path: "/var/log/wasphole/siem.log"`) {
+		t.Error("expected SIEM path")
+	}
+}
+
+func TestBuildConfig_TLSCert(t *testing.T) {
+	c := baseConfig()
+	c.TLSMode = "cert + key"
+	c.TLSCert = "/etc/tls/cert.pem"
+	c.TLSKey  = "/etc/tls/key.pem"
+	out := buildConfig(c)
+	if !strings.Contains(out, `cert_file: "/etc/tls/cert.pem"`) {
+		t.Error("expected cert_file")
+	}
+}
+
+func TestBuildConfig_TLSAcme(t *testing.T) {
+	c := baseConfig()
+	c.TLSMode     = "Let's Encrypt"
+	c.ACMEDomain  = "honeypot.example.com"
+	out := buildConfig(c)
+	if !strings.Contains(out, `acme_domain: "honeypot.example.com"`) {
+		t.Error("expected acme_domain")
+	}
+}
+
+func TestBuildConfig_CanaryFields(t *testing.T) {
+	c := baseConfig()
+	c.CanaryDomain   = "canary.example.com"
+	c.CanaryCallback = "https://hooks.example.com/canary"
+	c.CanaryAddr     = ":9090"
+	out := buildConfig(c)
+	if !strings.Contains(out, `domain: "canary.example.com"`) {
+		t.Error("expected canary domain")
+	}
+	if !strings.Contains(out, `listen_addr: ":9090"`) {
+		t.Error("expected canary listen_addr")
+	}
+}
+
+func TestBuildConfig_ProxyFields(t *testing.T) {
+	c := baseConfig()
+	c.ProxyAddr     = ":8081"
+	c.ProxyUpstream = "https://api.openai.com"
+	out := buildConfig(c)
+	if !strings.Contains(out, `listen_addr: ":8081"`) {
+		t.Error("expected proxy listen_addr")
+	}
+	if !strings.Contains(out, `upstream_url: "https://api.openai.com"`) {
+		t.Error("expected proxy upstream_url")
 	}
 }
 
 func TestBuildConfig_BaseURLAndAPIKey(t *testing.T) {
-	out := buildConfig("linux", "", "openai", "https://api.deepseek.com/v1", "sk-test-key", "deepseek-chat", "http", 8080, "")
+	c := baseConfig()
+	c.Provider = "openai"
+	c.BaseURL  = "https://api.deepseek.com/v1"
+	c.APIKey   = "sk-test-key"
+	c.Model    = "deepseek-chat"
+	out := buildConfig(c)
 	if !strings.Contains(out, `base_url: "https://api.deepseek.com/v1"`) {
-		t.Error("expected base_url in config")
+		t.Error("expected base_url")
 	}
 	if !strings.Contains(out, `api_key: "sk-test-key"`) {
-		t.Error("expected api_key in config")
+		t.Error("expected api_key")
+	}
+}
+
+func TestBuildConfig_SeedIncluded(t *testing.T) {
+	c := baseConfig()
+	c.Seed = "my-deterministic-seed"
+	if !strings.Contains(buildConfig(c), "seed: my-deterministic-seed") {
+		t.Error("expected seed in config")
+	}
+}
+
+func TestBuildConfig_SeedOmittedWhenBlank(t *testing.T) {
+	if strings.Contains(buildConfig(baseConfig()), "seed:") {
+		t.Error("expected seed omitted when blank")
 	}
 }
 
 func TestBuildConfig_ValidYAML(t *testing.T) {
-	out := buildConfig("windows", "healthcare", "openai", "", "", "gpt-4o", "http", 9090, "https://hooks.example.com/alert")
-	// Must contain no tabs (YAML indent must be spaces)
+	out := buildConfig(baseConfig())
 	if strings.Contains(out, "\t") {
 		t.Error("config must not contain tab characters")
 	}
-	// Must have a newline at end
 	if !strings.HasSuffix(out, "\n") {
 		t.Error("config must end with newline")
 	}
@@ -85,34 +184,29 @@ func TestBuildConfig_ValidYAML(t *testing.T) {
 
 func TestPickOne_ByNumber(t *testing.T) {
 	r := bufio.NewReader(strings.NewReader("2\n"))
-	got := pickOne(r, "OS?", []string{"linux", "windows"})
-	if got != "windows" {
-		t.Errorf("pickOne by number: got %q, want windows", got)
+	if got := pickOne(r, "OS?", []string{"linux", "windows"}); got != "windows" {
+		t.Errorf("got %q, want windows", got)
 	}
 }
 
 func TestPickOne_ByName(t *testing.T) {
 	r := bufio.NewReader(strings.NewReader("linux\n"))
-	got := pickOne(r, "OS?", []string{"linux", "windows"})
-	if got != "linux" {
-		t.Errorf("pickOne by name: got %q, want linux", got)
+	if got := pickOne(r, "OS?", []string{"linux", "windows"}); got != "linux" {
+		t.Errorf("got %q, want linux", got)
 	}
 }
 
 func TestPickOne_CaseInsensitive(t *testing.T) {
 	r := bufio.NewReader(strings.NewReader("WINDOWS\n"))
-	got := pickOne(r, "OS?", []string{"linux", "windows"})
-	if got != "windows" {
-		t.Errorf("pickOne case-insensitive: got %q, want windows", got)
+	if got := pickOne(r, "OS?", []string{"linux", "windows"}); got != "windows" {
+		t.Errorf("got %q, want windows", got)
 	}
 }
 
 func TestPickOne_RetriesOnInvalid(t *testing.T) {
-	// "bad" is invalid, then "1" is valid
 	r := bufio.NewReader(strings.NewReader("bad\n1\n"))
-	got := pickOne(r, "OS?", []string{"linux", "windows"})
-	if got != "linux" {
-		t.Errorf("pickOne retry: got %q, want linux", got)
+	if got := pickOne(r, "OS?", []string{"linux", "windows"}); got != "linux" {
+		t.Errorf("got %q, want linux", got)
 	}
 }
 
@@ -120,48 +214,47 @@ func TestPickOne_RetriesOnInvalid(t *testing.T) {
 
 func TestAskFree_ReturnsInput(t *testing.T) {
 	r := bufio.NewReader(strings.NewReader("my-value\n"))
-	got := askFree(r, "Label?", "default", "")
-	if got != "my-value" {
-		t.Errorf("askFree: got %q, want my-value", got)
+	if got := askFree(r, "Label?", "default", ""); got != "my-value" {
+		t.Errorf("got %q, want my-value", got)
 	}
 }
 
 func TestAskFree_ReturnsDefaultOnBlank(t *testing.T) {
 	r := bufio.NewReader(strings.NewReader("\n"))
-	got := askFree(r, "Label?", "default-val", "")
-	if got != "default-val" {
-		t.Errorf("askFree default: got %q, want default-val", got)
+	if got := askFree(r, "Label?", "default-val", ""); got != "default-val" {
+		t.Errorf("got %q, want default-val", got)
 	}
 }
 
 func TestAskFree_EmptyDefaultAndBlankInput(t *testing.T) {
 	r := bufio.NewReader(strings.NewReader("\n"))
-	got := askFree(r, "Label?", "", "")
-	if got != "" {
-		t.Errorf("askFree empty: got %q, want empty", got)
+	if got := askFree(r, "Label?", "", ""); got != "" {
+		t.Errorf("got %q, want empty", got)
 	}
 }
 
 // ── runSetup end-to-end ───────────────────────────────────────────────────────
 
 func TestRunSetup_WritesConfigFile(t *testing.T) {
-	dir := t.TempDir()
-	outPath := dir + "/config.yaml"
-
-	// Patch stdin and output path for the test
 	origStdin := os.Stdin
 	r, w, _ := os.Pipe()
 	os.Stdin = r
 
-	// Write answers: linux, fintech, anthropic, (blank baseURL), (blank key),
-	// (blank model=default), http, (blank port=8080), (blank webhook)
+	// Answers for all wizard questions in order:
+	// OS=1(linux), industry=fintech, seed=blank, provider=1(anthropic),
+	// baseURL=blank, apiKey=blank, model=blank(default), cacheDir=blank(default),
+	// transport=1(http), port=blank(8080), tls=1(none),
+	// webhook=blank, siem=1(none),
+	// canaryDomain=blank, canaryCallback=blank, canaryAddr=blank,
+	// proxyAddr=blank,
+	// sessionLogDir=blank(default)
 	go func() {
-		w.WriteString("1\nfintech\n1\n\n\n\n1\n\n\n")
+		w.WriteString("1\nfintech\n\n1\n\n\n\n\n1\n\n1\n\n1\n\n\n\n\n\n")
 		w.Close()
 	}()
 
-	// Temporarily redirect output path
 	origWD, _ := os.Getwd()
+	dir := t.TempDir()
 	os.Chdir(dir)
 	defer func() {
 		os.Stdin = origStdin
@@ -170,14 +263,14 @@ func TestRunSetup_WritesConfigFile(t *testing.T) {
 
 	runSetup()
 
-	data, err := os.ReadFile(outPath)
+	data, err := os.ReadFile(dir + "/config.yaml")
 	if err != nil {
 		t.Fatalf("config.yaml not written: %v", err)
 	}
-	if !strings.Contains(string(data), "mode: linux") {
-		t.Errorf("config missing mode: linux\n%s", data)
-	}
-	if !strings.Contains(string(data), "api_type: anthropic") {
-		t.Errorf("config missing api_type\n%s", data)
+	out := string(data)
+	for _, want := range []string{"mode: linux", "industry: fintech", "api_type: anthropic"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("config missing %q\n%s", want, out)
+		}
 	}
 }
